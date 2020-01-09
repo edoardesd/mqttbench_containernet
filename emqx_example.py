@@ -15,18 +15,19 @@ import docker
 import shlex
 import subprocess
 
-setLogLevel('info')
+SIM_NAME = "EMQX"
 
-image_name = "emqx/xterm:latest"
+setLogLevel('info')
+image_name = "flipperthedog/emqx-bash"
 docker_cmd = "docker exec -it mn.d{} /opt/emqx/bin/emqx start"
 cmd = "/opt/emqx/bin/emqx start"
-entrypoint_sh = "/usr/bin/docker-entrypoint.sh"
+entrypoint_sh = "/usr/bin/docker-entrypoint.sh" 
 start_sh = "/usr/bin/start.sh"
 
 net = Containernet(controller=Controller)
 
 info('*** Adding controller\n')
-net.addController('c0')
+net.addController('c0', port=6654)
 
 info('*** Adding docker containers using {} images\n'.format(image_name))
 
@@ -46,7 +47,7 @@ d2 = net.addDocker(name='d2', ip='10.0.0.252', ports=[1883], port_bindings={1883
 			     "EMQX_CLUSTER__STATIC__SEEDS":
 			     "docker1@172.17.0.2"})
 
-info('*** Starting emqx\n')
+info('*** Starting {}\n'.format(SIM_NAME))
 client = docker.from_env()
 
 d1_out = client.containers.get('mn.d1').exec_run(entrypoint_sh, stdout=True, stderr=True)
