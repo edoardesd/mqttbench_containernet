@@ -14,8 +14,11 @@ from mininet.log import info, error, setLogLevel
 import docker 
 import shlex
 import subprocess
+import os
 
 SIM_NAME = "RABBITMQ"
+
+PWD = os.getcwd()
 
 setLogLevel('info')
 image_name = "flipperthedog/rabbitmq:ping"
@@ -30,31 +33,25 @@ info('*** Adding docker containers using {} images\n'.format(image_name))
 
 #port bindings is swapped (host_machine:docker_container)
 d1 = net.addDocker(hostname="rabbit1", name='d1', ip='10.0.0.251', dimage=image_name, 
-		volumes=["/home/longo/mqttbench_containernet/.erlang.cookie:/var/lib/rabbitmq/.erlang.cookie"])
-		#environment={"EMQX_NAME": "docker1",
-		#	     "EMQX_NODE__DIST_LISTEN_MAX": 6379,
-		#	     "EMQX_LISTENER__TCP__EXTERNAL": 1883,
-		#	     "EMQX_CLUSTER__DISCOVERY": "static",
-		#	     "EMQX_CLUSTER__STATIC__SEEDS": "docker2@172.17.0.3"})
+		volumes=[PWD+"/rabbitmq1.conf:/etc/rabbitmq/rabbitmq.conf"],
+		environment={"RABBITMQ_ERLANG_COOKIE":"GPLDKBRJYMSKLTLZQDVG"})
+
 d1.cmd('echo "172.17.0.3      d2" >> /etc/hosts')
 
 d2 = net.addDocker(hostname="rabbit2", name='d2', ip='10.0.0.252', dimage=image_name, 
-		volumes=["/home/longo/mqttbench_containernet/.erlang.cookie:/var/lib/rabbitmq/.erlang.cookie"])
-		#environment={"EMQX_NAME": "docker1",
-		#	     "EMQX_NODE__DIST_LISTEN_MAX": 6379,
-		#	     "EMQX_LISTENER__TCP__EXTERNAL": 1883,
-		#	     "EMQX_CLUSTER__DISCOVERY": "static",
-		#	     "EMQX_CLUSTER__STATIC__SEEDS": "docker2@172.17.0.3"})
+		volumes=[PWD+"/rabbitmq2.conf:/etc/rabbitmq/rabbitmq.conf"],
+		environment={"RABBITMQ_ERLANG_COOKIE":"GPLDKBRJYMSKLTLZQDVG"})
+
 d2.cmd('echo "172.17.0.2      d1" >> /etc/hosts')
 
 info('*** Starting {}\n'.format(SIM_NAME))
 client = docker.from_env()
 
-#d1_entry_out = client.containers.get('mn.d1').exec_run(entrypoint_sh, stdout=False, stderr=False)
-#info('*** Running entrypoint for mn.d1, {}\n'.format(d1_entry_out))
+d1_entry_out = client.containers.get('mn.d1').exec_run(entrypoint_sh, stdout=False, stderr=False)
+info('*** Running entrypoint for mn.d1, {}\n'.format(d1_entry_out))
 
-#d2_entry_out = client.containers.get('mn.d2').exec_run(entrypoint_sh, stdout=False, stderr=False)
-#info('*** Running entrypoint for mn.d2, {}\n'.format(d2_entry_out))
+d2_entry_out = client.containers.get('mn.d2').exec_run(entrypoint_sh, stdout=False, stderr=False)
+info('*** Running entrypoint for mn.d2, {}\n'.format(d2_entry_out))
 
 info('*** Adding switches\n')
 s1 = net.addSwitch('s1')
