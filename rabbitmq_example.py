@@ -43,6 +43,7 @@ d2 = net.addDocker(hostname="rabbit2", name='d2', ip='10.0.0.252', dimage=image_
 		environment={"RABBITMQ_ERLANG_COOKIE":"GPLDKBRJYMSKLTLZQDVG"})
 
 d2.cmd('echo "172.17.0.2      d1" >> /etc/hosts')
+#d2.cmd('rabbitmqctl add_user user user')
 
 info('*** Starting {}\n'.format(SIM_NAME))
 client = docker.from_env()
@@ -72,3 +73,5 @@ info('*** Running CLI\n')
 CLI(net)
 info('*** Stopping network')
 net.stop()
+
+#still need to add the user
