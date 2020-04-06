@@ -11,7 +11,7 @@ from mininet.node import Controller
 from mininet.cli import CLI
 from mininet.link import TCLink
 from mininet.log import info, error, setLogLevel
-import docker 
+import docker
 import shlex
 import subprocess
 import os
@@ -31,19 +31,22 @@ net.addController('c0', port=6654)
 
 info('*** Adding docker containers using {} images\n'.format(image_name))
 
-#port bindings is swapped (host_machine:docker_container)
-d1 = net.addDocker(hostname="rabbit1", name='d1', ip='10.0.0.251', dimage=image_name, 
-		volumes=[PWD+"/rabbitmq1.conf:/etc/rabbitmq/rabbitmq.conf"],
-		environment={"RABBITMQ_ERLANG_COOKIE":"GPLDKBRJYMSKLTLZQDVG"})
+# port bindings is swapped (host_machine:docker_container)
+d1 = net.addDocker(hostname="rabbit1", name='d1', ip='10.0.0.251', dimage=image_name,
+                   ports=[5672], port_bindings={5672: 5672},
+                   volumes=[PWD + "/rabbitmq1.conf:/etc/rabbitmq/rabbitmq.conf"],
+                   environment={"RABBITMQ_ERLANG_COOKIE": "GPLDKBRJYMSKLTLZQDVG"})
 
-d1.cmd('echo "172.17.0.3      d2" >> /etc/hosts')
+d1.cmd('echo "10.0.0.252      d2" >> /etc/hosts')
 
-d2 = net.addDocker(hostname="rabbit2", name='d2', ip='10.0.0.252', dimage=image_name, 
-		volumes=[PWD+"/rabbitmq2.conf:/etc/rabbitmq/rabbitmq.conf"],
-		environment={"RABBITMQ_ERLANG_COOKIE":"GPLDKBRJYMSKLTLZQDVG"})
+d2 = net.addDocker(hostname="rabbit2", name='d2', ip='10.0.0.252', dimage=image_name,
+                   ports=[5672], port_bindings={5672: 5673},
+                   volumes=[PWD + "/rabbitmq2.conf:/etc/rabbitmq/rabbitmq.conf"],
+                   environment={"RABBITMQ_ERLANG_COOKIE": "GPLDKBRJYMSKLTLZQDVG"})
 
-d2.cmd('echo "172.17.0.2      d1" >> /etc/hosts')
-#d2.cmd('rabbitmqctl add_user user user')
+d2.cmd('echo "10.0.0.251      d1" >> /etc/hosts')
+
+# d2.cmd('rabbitmqctl add_user user user')
 
 info('*** Starting {}\n'.format(SIM_NAME))
 client = docker.from_env()
@@ -74,4 +77,4 @@ CLI(net)
 info('*** Stopping network')
 net.stop()
 
-#still need to add the user
+# still need to add the user
