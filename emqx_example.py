@@ -62,10 +62,11 @@ net.start()
 info('*** Starting {}\n\n'.format(SIM_NAME))
 client = docker.from_env()
 
-info('*** Starting d1\n')
+# TODO switch true to false
+info('*** Starting the entrypoints\n')
 info(client.containers.get('mn.d1').exec_run(ENTRYPOINT, stdout=True, stderr=True), '\n')
 info(client.containers.get('mn.d2').exec_run(ENTRYPOINT, stdout=True, stderr=True), '\n')
-info('*** Starting d2\n')
+info('*** Starting the brokers\n')
 info(client.containers.get('mn.d1').exec_run(START_EMQX, stdout=True, stderr=True), '\n')
 info(client.containers.get('mn.d2').exec_run(START_EMQX, stdout=True, stderr=True), '\n')
 

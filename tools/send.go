@@ -2,7 +2,8 @@ package main
 
 import (
 	"log"
-
+	"time"
+	"fmt"
 	"github.com/streadway/amqp"
 )
 
@@ -13,13 +14,15 @@ func failOnError(err error, msg string) {
 }
 
 func main() {
-	conn, err := amqp.Dial("amqp://guest:guest@antares:5672/")
+	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	failOnError(err, "Failed to connect to RabbitMQ")
 	defer conn.Close()
 
 	ch, err := conn.Channel()
 	failOnError(err, "Failed to open a channel")
 	defer ch.Close()
+
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 
 	q, err := ch.QueueDeclare(
 		"hello", // name
@@ -31,7 +34,7 @@ func main() {
 	)
 	failOnError(err, "Failed to declare a queue")
 
-	body := "Hello World!"
+	body := fmt.Sprintf("Hello, it's %s", makeTimestamp())
 	err = ch.Publish(
 		"",     // exchange
 		q.Name, // routing key
@@ -43,4 +46,11 @@ func main() {
 		})
 	log.Printf(" [x] Sent %s", body)
 	failOnError(err, "Failed to publish a message")
+}
+
+func makeTimestamp() string {
+    nanos := time.Now().UnixNano()
+    t := time.Unix(0, nanos)
+    timestamp := t.Format("15:04:05.000000")
+    return timestamp
 }
