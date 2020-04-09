@@ -20,8 +20,7 @@ setLogLevel('info')
 PWD = os.getcwd()
 SIM_NAME = "EMQX"
 IMAGE_NAME = "flipperthedog/emqx-bash:latest"
-START_EMQX = "/opt/emqx/bin/emqx start"
-ENTRYPOINT = "/usr/bin/docker-entrypoint.sh"
+
 
 net = Containernet(controller=Controller)
 
@@ -58,20 +57,18 @@ net.addLink(s2, d2)
 
 info('*** Starting network\n')
 net.start()
-
-info('*** Starting {}\n\n'.format(SIM_NAME))
-client = docker.from_env()
-
-# TODO switch true to false
-info('*** Starting the entrypoints\n')
-info(client.containers.get('mn.d1').exec_run(ENTRYPOINT, stdout=True, stderr=True), '\n')
-info(client.containers.get('mn.d2').exec_run(ENTRYPOINT, stdout=True, stderr=True), '\n')
-info('*** Starting the brokers\n')
-info(client.containers.get('mn.d1').exec_run(START_EMQX, stdout=True, stderr=True), '\n')
-info(client.containers.get('mn.d2').exec_run(START_EMQX, stdout=True, stderr=True), '\n')
+net.staticArp()
 
 info('*** Testing connectivity\n')
 net.ping([d1, d2])
+
+info('*** Waiting 5 seconds\n')
+time.sleep(5)
+
+# TODO switch true to false
+info('*** Starting the entrypoints\n')
+d1.start()
+d2.start()
 
 info('*** Running CLI\n')
 CLI(net)
