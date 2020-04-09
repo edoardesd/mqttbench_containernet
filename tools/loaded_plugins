@@ -1,6 +1,0 @@
-{emqx_management, true}.
-{emqx_recon, false}.
-{emqx_retainer, false}.
-{emqx_dashboard, false}.
-{emqx_rule_engine, true}.
-{emqx_bridge_mqtt, false}.
