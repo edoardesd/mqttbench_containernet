@@ -14,7 +14,7 @@ import time
 
 PWD = os.getcwd()
 VERSION = 0.2
-TOTAL_BROKERS = 5
+TOTAL_BROKERS = 3
 DELAY = 10
 IP_ADDR = '10.0.0.'
 IMAGES = {
@@ -23,11 +23,11 @@ IMAGES = {
 
 def arg_parse():
     parser = argparse.ArgumentParser(description='MQTT cluster simulation')
-    parser.add_argument('-n', '--broker-number', dest='bkr_num', default=5,
+    parser.add_argument('-n', '--broker-number', dest='bkr_num', default=TOTAL_BROKERS,
                         help='specify the size of the cluster')
     parser.add_argument('-t', '--type', dest='cluster_type', default='emqx',
                         help='broker type (EMQX, RABBITMQ, VERNEMQ, HIVEMQ)')
-    parser.add_argument('-d', '--delay', dest='link_delay', default=10,
+    parser.add_argument('-d', '--delay', dest='link_delay', default=DELAY,
                         help='delay over a simple link')
     return parser.parse_args()
 
@@ -36,7 +36,7 @@ def emqx(broker):
     print("EMQX test")
     local_list = []
 
-    for cnt in range(2, args.bkr_num + 1):
+    for cnt in range(2, args.bkr_num + 2):
         container_name = "{}_{}".format(args.cluster_type, cnt)
         local_address = IP_ADDR+str(250+cnt)
         d = net.addDocker(name=container_name, ip= local_address,
@@ -98,29 +98,21 @@ def main(_args):
     container_list = cluster_type(_args.cluster_type.upper())
     print(container_list)
 
-    info('*** Adding switches\n')
-    switch_list = []
-    for switch in range(2, args.bkr_num + 1):
-        switch_name = "sw_{}".format(switch)
-        s = net.addSwitch(switch_name)
-        switch_list.append(s)
+    info('*** Adding switch\n')
+    s1 = net.addSwitch('s1')
 
-    print(switch_list)
-
-    info('*** Adding container-switch link\n')
-    for container, switch in zip(container_list, switch_list):
-        net.addLink(container, switch)
-
-    info('*** Adding switch-switch link\n')
-    for subset in itertools.combinations(switch_list, 2):
-        net.addLink(subset[0], subset[1], cls=TCLink, delay='1ms', bw=1)
+    info('*** Adding container-switch links\n')
+    for c in container_list:
+        print(net.addLink(c, s1, delay='1ms', bw=1))
 
     info('*** Starting network\n')
     net.start()
     net.staticArp()
 
+    print("\n")
     info('*** Testing connectivity\n')
     for subset in itertools.combinations(container_list, 2):
+        print(subset[0], subset[1], "\n")
         net.ping([subset[0], subset[1]])
 
     info('*** Running CLI\n')
