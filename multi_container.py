@@ -26,7 +26,7 @@ IMAGES = {
 
 def arg_parse():
     parser = argparse.ArgumentParser(description='MQTT cluster simulation')
-    parser.add_argument('-n', '--broker-number', dest='bkr_num', default=TOTAL_BROKERS,
+    parser.add_argument('-n', '--broker-number', dest='broker_num', default=TOTAL_BROKERS,
                         help='specify the size of the cluster')
     parser.add_argument('-t', '--type', dest='cluster_type', default='rabbitmq',
                         help='broker type (EMQX, RABBITMQ, VERNEMQ, HIVEMQ)')
@@ -49,23 +49,24 @@ def start_emqx(cont_name, cont_address, bind_ip, master_node):
 
 
 def start_rabbitmq(cont_name, cont_address, bind_ip, master_node):
-    if master_node == "{}@{}".format(cont_name, cont_address):
-        info('Creating new rabbitmq config file\n')
-        dest_file = "{}/confiles/rabbitmq_all.conf".format(PWD)
-        copyfile(PWD + "/confiles/rabbitmq.conf", dest_file)
-        with open(dest_file, "a") as f:
-            f.write("cluster_formation.classic_config.nodes.1 = rabbit@{}\n".format(master_node[:master_node.index("@")]))
-
+    dest_file = "{}/confiles/rabbitmq_{}.conf".format(PWD, cont_address[-3:])
+    copyfile(PWD + "/confiles/rabbitmq.conf", dest_file)
+    with open(dest_file, "a") as f:
+        c = 0
+        for i in range(2, args.broker_num + 2):
+            if IP_ADDR + str(250 + i) != cont_address:
+                c += 1
+                f.write("cluster_formation.classic_config.nodes.{} = rabbit@rabbitmq_{}\n".format(c, i))
 
     d = net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
-                         dimage=IMAGES["RABBITMQ"],
-                         port_bindings={1883: bind_ip},
-                         volumes=[PWD + "/confiles/rabbitmq_all_{}.conf:/etc/rabbitmq/rabbitmq.conf".format(cont_address[-1])],
-                         environment={"RABBITMQ_ERLANG_COOKIE": "GPLDKBRJYMSKLTLZQDVG"})
+                      dimage=IMAGES["RABBITMQ"],
+                      port_bindings={1883: bind_ip},
+                      volumes=[PWD + "/confiles/rabbitmq_{}.conf:/etc/rabbitmq/rabbitmq.conf".format(cont_address[-3:])],
+                      environment={"RABBITMQ_ERLANG_COOKIE": "GPLDKBRJYMSKLTLZQDVG"})
 
-    d.cmd('echo "{}      {}" >> /etc/hosts'.format(master_node[master_node.index("@")+1:], master_node[:master_node.index("@")]))
-    d.cmd('echo "10.0.0.253      rabbitmq_3" >> /etc/hosts')
-    d.cmd('echo "10.0.0.254      rabbitmq_4" >> /etc/hosts')
+    for i in range(2, args.broker_num + 2):
+        if IP_ADDR + str(250 + i) != cont_address:
+            d.cmd('echo "{}      {}" >> /etc/hosts'.format(IP_ADDR + str(250 + i), "rabbitmq_" + str(i)))
 
     return d
 
@@ -102,7 +103,7 @@ def cluster_type(argument):
     local_list = []
 
     my_master = None
-    for cnt in range(2, args.bkr_num + 2):
+    for cnt in range(2, args.broker_num + 2):
         container_name = "{}_{}".format(args.cluster_type, cnt)
         local_address = IP_ADDR + str(250 + cnt)
         bind_addr = 1880 + cnt
@@ -118,7 +119,7 @@ def main(_args):
     info('\n*** Multi containernet generator v{} ***'.format(VERSION))
     info('\nargs:')
     info('\n\tCLUSTER TYPE: {}'.format(args.cluster_type))
-    info('\n\tNUMBER OF BROKERS: {}'.format(args.bkr_num))
+    info('\n\tNUMBER OF BROKERS: {}'.format(args.broker_num))
     info('\n\tDELAY: {}'.format(args.link_delay))
     info('\n')
 
@@ -135,7 +136,7 @@ def main(_args):
 
     info('\n*** Adding container-switch links\n')
     for c in container_list:
-        info(net.addLink(c, s1, cls=TCLink, delay='{}ms'.format(DELAY / 2), bw=1))
+        info(net.addLink(c, s1, cls=TCLink, delay='{}ms'.format(_args.link_delay / 2), bw=1))
 
     info('\n*** Starting network\n')
     net.start()
@@ -144,16 +145,16 @@ def main(_args):
     info('\n*** Testing connectivity\n')
     net.pingAll()
 
-    info('\n*** Waiting the network start up...\n')
-    time.sleep(DELAY / 2)
+    info('\n*** Waiting the network start up ({} secs)...\n'.format(_args.link_delay/2))
+    time.sleep(_args.link_delay / 2)
 
     info('\n*** Starting the entrypoints\n')
     # START CONTAINERS
     for c in container_list:
         c.start()
 
-    info('*** Waiting the boot (10 secs)...\n')
-    time.sleep(DELAY)
+    info('*** Waiting the boot ({} secs)...\n'.format(_args.link_delay))
+    time.sleep(_args.link_delay)
 
     info('*** Running CLI\n')
     CLI(net)
