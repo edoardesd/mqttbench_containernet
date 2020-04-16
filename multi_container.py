@@ -59,9 +59,13 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node):
                 f.write("cluster_formation.classic_config.nodes.{} = rabbit@rabbitmq_{}\n".format(c, i))
 
     d = net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
-                      dimage=IMAGES["RABBITMQ"],
-                      port_bindings={1883: bind_ip},
-                      volumes=[PWD + "/confiles/rabbitmq_{}.conf:/etc/rabbitmq/rabbitmq.conf".format(cont_address[-3:])],
+                      dimage=IMAGES["RABBITMQ"], \
+                      ports=[5672, 1883],
+                      port_bindings={5672: 5670 + (bind_ip - 1880),
+                                     1883: bind_ip},
+                      volumes=[
+                          PWD + "/confiles/rabbitmq_{}.conf:/etc/rabbitmq/rabbitmq.conf".format(cont_address[-3:]),
+                          PWD + "/confiles/enabled_plugins:/etc/rabbitmq/enabled_plugins"],
                       environment={"RABBITMQ_ERLANG_COOKIE": "GPLDKBRJYMSKLTLZQDVG"})
 
     for i in range(2, args.broker_num + 2):
@@ -145,7 +149,7 @@ def main(_args):
     info('\n*** Testing connectivity\n')
     net.pingAll()
 
-    info('\n*** Waiting the network start up ({} secs)...\n'.format(_args.link_delay/2))
+    info('\n*** Waiting the network start up ({} secs)...\n'.format(_args.link_delay / 2))
     time.sleep(_args.link_delay / 2)
 
     info('\n*** Starting the entrypoints\n')
