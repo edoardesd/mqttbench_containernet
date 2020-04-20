@@ -11,6 +11,7 @@ from shutil import copyfile
 import itertools
 import os
 import time
+import xml.etree.ElementTree as ET
 
 PWD = os.getcwd()
 VERSION = 0.2
@@ -21,6 +22,7 @@ IMAGES = {
     "EMQX": "flipperthedog/emqx-ip:latest",
     "VERNEMQ": "francigjeci/vernemq-debian:latest",
     "RABBITMQ": "flipperthedog/rabbitmq:ping"
+    "HIVEMQ": "francigjeci/hivemq:dns-image"
 }
 
 
@@ -75,8 +77,44 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node):
     return d
 
 
-def start_hivemq(broker):
-    info('HiveMQ test')
+def start_hivemq(cont_name, cont_address, bind_ip, master_node):
+    source_config_file_path = os.path.join(PWD, 'confiles/config-dns.xml')
+    dest_file = "{}/confiles/config-dns_{}.xml".format(PWD, cont_address[-3:])
+
+    __port = 8000
+
+    config_file = ET.parse(source_config_file_path)
+    cluster_nodes = config_file.getroot().find('cluster').find('discovery').find('static')
+    if cluster_nodes is None:
+        raise ModuleNotFoundError('Element not found')
+    else:
+        # Remove the existing elements
+        for node in cluster_nodes:
+            cluster_nodes.remove(node)
+
+        # Add all cluster's nodes into config file
+        _brokers_index = range(2, args.broker_num + 2)
+        _brokers_addr = [IP_ADDR + str(250 + _broker_index) for _broker_index in range(2, args.broker_num + 2)]
+        for broker_addr in _brokers_addr:
+            _new_node = ET.Element('node')
+            _host = ET.Element('host')
+            _host.text = str(broker_addr)
+            _port = ET.Element('port')
+            _port.text = str(__port)
+            _new_node.append(_host)
+            _new_node.append(_port)
+            cluster_nodes.append(_new_node)
+
+        config_file.write(dest_file)
+
+        return net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
+                         ports=[1883], port_bindings={1883: bind_ip},
+                         dimage=IMAGES["HIVEMQ"],
+                         volumes=[
+                            PWD + "/confiles/config-dns_{}.xml:/opt/hivemq/conf/config.xml".format(cont_address[-3:])],
+                         environment={
+                             "HIVEMQ_BIND_ADDRESS": cont_address
+                         })
 
 
 def start_vernemq(cont_name, cont_address, bind_ip, master_node):
