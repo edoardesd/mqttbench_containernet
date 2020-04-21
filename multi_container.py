@@ -15,13 +15,13 @@ import xml.etree.ElementTree as ET
 
 PWD = os.getcwd()
 VERSION = 0.2
-TOTAL_BROKERS = 3
+TOTAL_BROKERS = 7
 DELAY = 10
 IP_ADDR = '10.0.0.'
 IMAGES = {
     "EMQX": "flipperthedog/emqx-ip:latest",
     "VERNEMQ": "francigjeci/vernemq-debian:latest",
-    "RABBITMQ": "flipperthedog/rabbitmq:ping"
+    "RABBITMQ": "flipperthedog/rabbitmq:ping",
     "HIVEMQ": "francigjeci/hivemq:dns-image"
 }
 
@@ -29,11 +29,11 @@ IMAGES = {
 def arg_parse():
     parser = argparse.ArgumentParser(description='MQTT cluster simulation')
     parser.add_argument('-n', '--broker-number', dest='broker_num', default=TOTAL_BROKERS,
-                        help='specify the size of the cluster')
+                        help='specify the size of the cluster', type=int)
     parser.add_argument('-t', '--type', dest='cluster_type', default='rabbitmq',
                         help='broker type (EMQX, RABBITMQ, VERNEMQ, HIVEMQ)')
     parser.add_argument('-d', '--delay', dest='link_delay', default=DELAY,
-                        help='delay over a simple link')
+                        help='delay over a simple link', type=int)
     return parser.parse_args()
 
 
@@ -56,7 +56,7 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node):
     with open(dest_file, "a") as f:
         c = 0
         for i in range(2, args.broker_num + 2):
-            if IP_ADDR + str(250 + i) != cont_address:
+            if IP_ADDR + str(200 + i) != cont_address:
                 c += 1
                 f.write("cluster_formation.classic_config.nodes.{} = rabbit@rabbitmq_{}\n".format(c, i))
 
@@ -71,8 +71,8 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node):
                       environment={"RABBITMQ_ERLANG_COOKIE": "GPLDKBRJYMSKLTLZQDVG"})
 
     for i in range(2, args.broker_num + 2):
-        if IP_ADDR + str(250 + i) != cont_address:
-            d.cmd('echo "{}      {}" >> /etc/hosts'.format(IP_ADDR + str(250 + i), "rabbitmq_" + str(i)))
+        if IP_ADDR + str(200 + i) != cont_address:
+            d.cmd('echo "{}      {}" >> /etc/hosts'.format(IP_ADDR + str(200 + i), "rabbitmq_" + str(i)))
 
     return d
 
@@ -94,7 +94,7 @@ def start_hivemq(cont_name, cont_address, bind_ip, master_node):
 
         # Add all cluster's nodes into config file
         _brokers_index = range(2, args.broker_num + 2)
-        _brokers_addr = [IP_ADDR + str(250 + _broker_index) for _broker_index in range(2, args.broker_num + 2)]
+        _brokers_addr = [IP_ADDR + str(200 + _broker_index) for _broker_index in range(2, args.broker_num + 2)]
         for broker_addr in _brokers_addr:
             _new_node = ET.Element('node')
             _host = ET.Element('host')
@@ -147,7 +147,7 @@ def cluster_type(argument):
     my_master = None
     for cnt in range(2, args.broker_num + 2):
         container_name = "{}_{}".format(args.cluster_type, cnt)
-        local_address = IP_ADDR + str(250 + cnt)
+        local_address = IP_ADDR + str(200 + cnt)
         bind_addr = 1880 + cnt
         if my_master is None:
             my_master = "{}@{}".format(container_name, local_address)
