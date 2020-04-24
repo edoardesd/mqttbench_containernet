@@ -59,10 +59,10 @@ def run():
     net.addController('c0', port=6654)
 
     defaultIP = '10.0.0.1/24'  # IP address for r0-eth1
-    info('*** Adding hosts\n')
+    info('*** Adding routers\n')
     r1 = net.addHost('r1', cls=LinuxRouter, ip='10.0.0.1/24')
-    r2 = net.addHost('r2', cls=LinuxRouter, ip='10.0.1.1/24')
-    r3 = net.addHost('r3', cls=LinuxRouter, ip='10.0.2.1/24')
+    r2 = net.addHost('r2', cls=LinuxRouter, ip='10.1.0.1/24')
+    r3 = net.addHost('r3', cls=LinuxRouter, ip='10.2.0.1/24')
 
     info('*** Adding switches\n')
     s1, s2, s3 = [net.addSwitch(s) for s in ('s1', 's2', 's3')]
@@ -72,17 +72,17 @@ def run():
                  params2={'ip': '10.0.0.1/24'})
 
     net.addLink(s2, r2, intfName2='r2-eth1',
-                 params2={'ip': '10.0.1.1/24'})
+                 params2={'ip': '10.1.0.1/24'})
 
     net.addLink(s3, r3, intfName2='r3-eth1',
-                 params2={'ip': '10.0.2.1/24'})
+                 params2={'ip': '10.2.0.1/24'})
 
     info('*** 1) Adding switch-switch link\n')
-    net.addLink(r1, r2, intfName1='r1-eth2', intfName2='r2-eth2')
+    net.addLink(r1, r2, intfName1='r1-eth2', intfName2='r2-eth2', params1={'ip': '10.1.0.1/24'}, params2={'ip': '10.0.0.1/24'})
     info('*** 2) Adding switch-switch link\n')
-    net.addLink(r2, r3, intfName1='r2-eth3', intfName2='r3-eth2')
+    net.addLink(r2, r3, intfName1='r2-eth3', intfName2='r3-eth2', params1={'ip': '10.2.0.1/24'}, params2={'ip': '10.1.0.1/24'})
     info('*** 3) Adding switch-switch link\n')
-    net.addLink(r1, r3, intfName1='r1-eth3', intfName2='r3-eth3')
+    net.addLink(r1, r3, intfName1='r1-eth3', intfName2='r3-eth3', params1={'ip': '10.2.0.1/24'}, params2={'ip': '10.0.0.1/24'})
 
     d1 = net.addDocker(name='d1', ip='10.0.0.251/24', defaultRoute='via 10.0.0.1', ports=[1883], port_bindings={1883: 1883}, dimage=IMAGE_NAME,
                    environment={"EMQX_NAME": "docker1",
@@ -94,7 +94,7 @@ def run():
 
     d2 = net.addDocker(name='d2', ip='10.1.0.252/24', defaultRoute='via 10.1.0.1', ports=[1883], port_bindings={1883: 1884}, dimage=IMAGE_NAME,
                        environment={"EMQX_NAME": "docker2",
-                                    "EMQX_HOST": "10.0.1.252",
+                                    "EMQX_HOST": "10.1.0.252",
                                     "EMQX_NODE__DIST_LISTEN_MAX": 6379,
                                     "EMQX_LISTENER__TCP__EXTERNAL": 1883,
                                     "EMQX_CLUSTER__DISCOVERY": "static",
@@ -103,14 +103,18 @@ def run():
     d3 = net.addDocker(name='d3', ip='10.2.0.253/24', defaultRoute='via 10.2.0.1', ports=[1883],
                        port_bindings={1883: 1885}, dimage=IMAGE_NAME,
                        environment={"EMQX_NAME": "docker3",
-                                    "EMQX_HOST": "10.0.2.253",
+                                    "EMQX_HOST": "10.2.0.253",
                                     "EMQX_NODE__DIST_LISTEN_MAX": 6379,
                                     "EMQX_LISTENER__TCP__EXTERNAL": 1883,
                                     "EMQX_CLUSTER__DISCOVERY": "static",
                                     "EMQX_CLUSTER__STATIC__SEEDS": "docker1@10.0.0.251"})
 
-    for h, s in [(d1, s1), (d2, s2), (d3, s3)]:
-        info(net.addLink(h, s, cls=TCLink, delay='10ms'))
+    for d, s in [(d1, s1), (d2, s2), (d3, s3)]:
+        info(net.addLink(d, s, cls=TCLink, delay='10ms'))
+
+    # info(net.addLink(d1, s1, cls=TCLink, delay='10ms', intfName2='d1-eth1'))
+    # info(net.addLink(d2, s2, cls=TCLink, delay='10ms', intfName2='d2-eth1'))
+    # info(net.addLink(d3, s3, cls=TCLink, delay='10ms', intfName2='d3-eth1'))
 
     info('*** Starting network\n')
     net.start()
@@ -129,9 +133,9 @@ def run():
     net.pingAll()
 
     info('*** Starting brokers\n')
-    d1.start()
-    d2.start()
-    d3.start()
+    # d1.start()
+    # d2.start()
+    # d3.start()
 
     CLI(net)
     net.stop()
