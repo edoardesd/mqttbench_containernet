@@ -37,8 +37,9 @@ def run():
     #
 
     networks = [ipaddress.ip_network('10.0.{}.0/24'.format(net)) for net in range(0, 3)]
-    linking_networks = [ipaddress.ip_network('10.{}.0.0/24'.format(net)) for net in range(10, 13)]
+    linking_networks = [ipaddress.ip_network('10.{}.0.0/24'.format(net)) for net in range(10, 40, 10)]
     print(networks)
+    print(linking_networks)
 
     router_1 = '{}/24'.format(next(networks[0].hosts()))
     router_2 = '{}/24'.format(next(networks[1].hosts()))
@@ -62,41 +63,39 @@ def run():
     net.addLink(s3, r3, intfName2='r3-eth1',
                 params2={'ip': router_3})
 
-    info('*** Adding switch-switch link\n')
+    info('*** Adding router-router links\n')
     net.addLink(r1, r2, intfName1='r1-eth2', intfName2='r2-eth2',
-                params1={'ip': '10.100.0.1/24'},
-                params2={'ip': '10.100.0.2/24'})
-    net.addLink(r2, r3, intfName1='r2-eth3', intfName2='r3-eth2', params1={'ip': '10.200.0.1/24'},
-                params2={'ip': '10.200.0.2/24'})
-    net.addLink(r3, r1, intfName1='r3-eth3', intfName2='r1-eth3', params1={'ip': '10.150.0.2/24'},
-                params2={'ip': '10.150.0.1/24'})
+                params1={'ip': '{}/24'.format(linking_networks[0][1].compressed)},
+                params2={'ip': '{}/24'.format(linking_networks[0][2].compressed)})
+    net.addLink(r2, r3, intfName1='r2-eth3', intfName2='r3-eth2',
+                params1={'ip': '{}/24'.format(linking_networks[1][1].compressed)},
+                params2={'ip': '{}/24'.format(linking_networks[1][2].compressed)})
+    net.addLink(r1, r3, intfName1='r1-eth3', intfName2='r3-eth3',
+                params1={'ip': '{}/24'.format(linking_networks[2][1].compressed)},
+                params2={'ip': '{}/24'.format(linking_networks[2][2].compressed)})
 
     info('*** Adding routing\n')
-    r1.cmd("ip route add 10.0.1.0/24 via 10.100.0.2 dev r1-eth2")
-    r2.cmd("ip route add 10.0.0.0/24 via 10.100.0.1 dev r2-eth2")
+    r1.cmd("ip route add 10.0.1.0/24 via 10.10.0.2 dev r1-eth2")
+    r2.cmd("ip route add 10.0.0.0/24 via 10.10.0.1 dev r2-eth2")
 
-    r2.cmd("ip route add 10.0.2.0/24 via 10.200.0.2 dev r2-eth3")
-    r3.cmd("ip route add 10.0.1.0/24 via 10.200.0.1 dev r3-eth2")
+    r2.cmd("ip route add 10.0.2.0/24 via 10.20.0.2 dev r2-eth3")
+    r3.cmd("ip route add 10.0.1.0/24 via 10.20.0.1 dev r3-eth2")
 
-    r1.cmd("ip route add 10.0.2.0/24 via 10.150.0.2 dev r1-eth3")
-    r3.cmd("ip route add 10.0.0.0/24 via 10.150.0.1 dev r3-eth3")
-    # r1.cmd("echo 1 > /proc/sys/net/ipv4/ip_forward")
-    # r2.cmd("echo 1 > /proc/sys/net/ipv4/ip_forward")
+    r1.cmd("ip route add 10.0.2.0/24 via 10.30.0.2 dev r1-eth3")
+    r3.cmd("ip route add 10.0.0.0/24 via 10.30.0.1 dev r3-eth3")
 
     info('*** Adding hosts\n')
-    # d1 = net.addHost(name='d1', ip='10.0.0.251/24', defaultRoute='via 10.0.0.1')
-    # d2 = net.addHost(name='d2', ip='10.0.1.252/24', defaultRoute='via 10.0.1.1')
-    # d3 = net.addHost(name='d3', ip='10.0.2.253/24', defaultRoute='via 10.0.2.1')
+    d1 = net.addDocker(name='d1', ip='10.0.0.251/24', defaultRoute='via 10.0.0.1', ports=[1883],
+                       port_bindings={1883: 1883}, dimage=IMAGE_NAME,
+                       environment={"EMQX_NAME": "docker1",
+                                    "EMQX_HOST": "10.0.0.251",
+                                    "EMQX_NODE__DIST_LISTEN_MAX": 6379,
+                                    "EMQX_LISTENER__TCP__EXTERNAL": 1883,
+                                    "EMQX_CLUSTER__DISCOVERY": "static",
+                                    "EMQX_CLUSTER__STATIC__SEEDS": "docker2@10.0.1.252"})
 
-    d1 = net.addDocker(name='d1', ip='10.0.0.251/24', defaultRoute='via 10.0.0.1', ports=[1883], port_bindings={1883: 1883}, dimage=IMAGE_NAME,
-                   environment={"EMQX_NAME": "docker1",
-                                "EMQX_HOST": "10.0.0.251",
-                                "EMQX_NODE__DIST_LISTEN_MAX": 6379,
-                                "EMQX_LISTENER__TCP__EXTERNAL": 1883,
-                                "EMQX_CLUSTER__DISCOVERY": "static",
-                                "EMQX_CLUSTER__STATIC__SEEDS": "docker2@10.0.1.252"})
-
-    d2 = net.addDocker(name='d2', ip='10.0.1.252/24', defaultRoute='via 10.0.1.1', ports=[1883], port_bindings={1883: 1884}, dimage=IMAGE_NAME,
+    d2 = net.addDocker(name='d2', ip='10.0.1.252/24', defaultRoute='via 10.0.1.1', ports=[1883],
+                       port_bindings={1883: 1884}, dimage=IMAGE_NAME,
                        environment={"EMQX_NAME": "docker2",
                                     "EMQX_HOST": "10.0.1.252",
                                     "EMQX_NODE__DIST_LISTEN_MAX": 6379,
@@ -119,7 +118,7 @@ def run():
 
     info('*** Starting network\n')
     net.start()
-    # net.staticArp()
+    net.staticArp()
 
     info('*** Routing Table on Router:\n')
     print((net['r1'].cmd('route')))
@@ -141,7 +140,7 @@ def run():
     CLI(net)
     net.stop()
 
+
 if __name__ == '__main__':
     setLogLevel('info')
     run()
-
