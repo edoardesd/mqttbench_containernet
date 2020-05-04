@@ -42,11 +42,11 @@ def arg_parse():
     parser = argparse.ArgumentParser(description='MQTT cluster simulation')
     parser.add_argument('-t', '--type', dest='cluster_type', default='emqx',
                         help='broker type (EMQX, RABBITMQ, VERNEMQ, HIVEMQ)')
-    parser.add_argument('-d', '--delay_r', dest='router_delay', default=DELAY,
+    parser.add_argument('-d', '--delay-router', dest='router_delay', default=DELAY,
                         help='delay over a router link', type=int)
     parser.add_argument('-c', '--delay-container', dest='container_delay', default=DELAY,
                         help='delay over a switch-container link', type=int)
-    
+
     return parser.parse_args()
 
 
@@ -184,105 +184,28 @@ def run():
     net.addController('c0', port=6654)
     info('  DONE\n')
 
+    # add network addresses
     networks = [ipaddress.ip_network('10.0.{}.0/24'.format(sub_net)) for sub_net in range(TOTAL_BROKERS)]
     info('\nNetwork created: {}'.format(networks))
 
+    # add routers
     info('*** Adding routers\n')
     router_networks = ['{}/24'.format(next(router.hosts())) for router in networks]
 
-    router_list = [net.addHost('r{}'.format(counter), cls=LinuxRouter, ip=router) for counter, router in
-                   enumerate(router_networks)]
+    print(router_networks)
+
+    router_list = [net.addHost('r0', cls=LinuxRouter, ip='10.0.0.1/24')]
+    print(router_list)
 
     info('*** Adding switches\n')
     switch_list = [net.addSwitch('s{}'.format(s)) for s in range(TOTAL_BROKERS)]
 
     info('*** Adding host-switch links\n')
-    for count, (s, r, n) in enumerate(zip(switch_list, router_list, router_networks)):
-        print(net.addLink(s, r, intfName2='r{}-eth0'.format(count), params2={'ip': n}))
+    for count, (s, n) in enumerate(zip(switch_list, router_networks)):
+        print(net.addLink(s, router_list[0], intfName2='r{}-eth0'.format(count), params2={'ip': n}))
 
-    info('*** Adding router-router links\n')
-    # from 0 to all
-    net.addLink(router_list[0], router_list[1], intfName1='r0-eth1', intfName2='r1-eth1',
-                params1={'ip': '10.10.0.1/24'},
-                params2={'ip': '10.10.0.2/24'},
-                cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-    net.addLink(router_list[0], router_list[2], intfName1='r0-eth2', intfName2='r2-eth1',
-                params1={'ip': '10.11.0.1/24'},
-                params2={'ip': '10.11.0.2/24'},
-                cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-    net.addLink(router_list[0], router_list[3], intfName1='r0-eth3', intfName2='r3-eth1',
-                params1={'ip': '10.12.0.1/24'},
-                params2={'ip': '10.12.0.2/24'},
-                cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
+    info('*** Adding router-switch links\n')
 
-    net.addLink(router_list[0], router_list[4], intfName1='r0-eth4', intfName2='r4-eth1',
-                params1={'ip': '10.13.0.1/24'},
-                params2={'ip': '10.13.0.2/24'},
-                cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    # from 1 to all
-    net.addLink(router_list[1], router_list[2], intfName1='r1-eth2', intfName2='r2-eth2',
-                params1={'ip': '10.20.0.1/24'},
-                params2={'ip': '10.20.0.2/24'},
-                cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    net.addLink(router_list[1], router_list[3], intfName1='r1-eth3', intfName2='r3-eth2',
-                params1={'ip': '10.21.0.1/24'},
-                params2={'ip': '10.21.0.2/24'},
-                cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    net.addLink(router_list[1], router_list[4], intfName1='r1-eth4', intfName2='r4-eth2',
-                params1={'ip': '10.22.0.1/24'},
-                params2={'ip': '10.22.0.2/24'},
-                cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    # from 2 to all
-    net.addLink(router_list[2], router_list[3], intfName1='r2-eth3', intfName2='r3-eth3',
-                params1={'ip': '10.30.0.1/24'},
-                params2={'ip': '10.30.0.2/24'},
-                cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    net.addLink(router_list[2], router_list[4], intfName1='r2-eth4', intfName2='r4-eth3',
-                params1={'ip': '10.31.0.1/24'},
-                params2={'ip': '10.31.0.2/24'},
-                cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    # from 3 to 4
-    net.addLink(router_list[3], router_list[4], intfName1='r3-eth4', intfName2='r4-eth4',
-                params1={'ip': '10.40.0.1/24'},
-                params2={'ip': '10.40.0.2/24'},
-                cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    info('*** Adding routing\n')
-    # router 0
-    router_list[0].cmd("ip route add 10.0.1.0/24 via 10.10.0.2 dev r0-eth1")
-    router_list[0].cmd("ip route add 10.0.2.0/24 via 10.11.0.2 dev r0-eth2")
-    router_list[0].cmd("ip route add 10.0.3.0/24 via 10.12.0.2 dev r0-eth3")
-    router_list[0].cmd("ip route add 10.0.4.0/24 via 10.13.0.2 dev r0-eth4")
-
-    # router 1
-    router_list[1].cmd("ip route add 10.0.0.0/24 via 10.10.0.1 dev r1-eth1")
-    router_list[1].cmd("ip route add 10.0.2.0/24 via 10.20.0.2 dev r1-eth2")
-    router_list[1].cmd("ip route add 10.0.3.0/24 via 10.21.0.2 dev r1-eth3")
-    router_list[1].cmd("ip route add 10.0.4.0/24 via 10.22.0.2 dev r1-eth4")
-
-    # router 2
-    router_list[2].cmd("ip route add 10.0.0.0/24 via 10.11.0.1 dev r2-eth1")
-    router_list[2].cmd("ip route add 10.0.1.0/24 via 10.20.0.1 dev r2-eth2")
-    router_list[2].cmd("ip route add 10.0.3.0/24 via 10.30.0.2 dev r2-eth3")
-    router_list[2].cmd("ip route add 10.0.4.0/24 via 10.31.0.2 dev r2-eth4")
-
-    # router 3
-    router_list[3].cmd("ip route add 10.0.0.0/24 via 10.12.0.1 dev r3-eth1")
-    router_list[3].cmd("ip route add 10.0.1.0/24 via 10.21.0.1 dev r3-eth2")
-    router_list[3].cmd("ip route add 10.0.2.0/24 via 10.30.0.1 dev r3-eth3")
-    router_list[3].cmd("ip route add 10.0.4.0/24 via 10.40.0.2 dev r3-eth4")
-
-    # router 4
-    router_list[4].cmd("ip route add 10.0.0.0/24 via 10.13.0.1 dev r4-eth1")
-    router_list[4].cmd("ip route add 10.0.1.0/24 via 10.22.0.1 dev r4-eth2")
-    router_list[4].cmd("ip route add 10.0.2.0/24 via 10.31.0.1 dev r4-eth3")
-    router_list[4].cmd("ip route add 10.0.3.0/24 via 10.40.0.1 dev r4-eth4")
 
     return switch_list, networks
 
