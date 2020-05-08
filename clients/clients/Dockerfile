@@ -14,3 +14,8 @@ WORKDIR /home/ubuntu
 COPY . /home/ubuntu
 
 CMD ["/usr/local/bin/python3", "-u", "container_python.py"]
+
+
+# how run this dockerfile
+# go into this folder
+# docker build --tag flipperthedog/sub_client .

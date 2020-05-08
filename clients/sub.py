@@ -14,7 +14,7 @@ JSON_PUBS = 'pubs'
 JSON_ALL = 'all'
 JSON_DEFAULT = 'default'
 NAME = "sub_"
-IMAGE_NAME = 'clients'
+IMAGE_NAME = 'flipperthedog/sub_client'
 TOTAL_BROKERS = 5
 
 
