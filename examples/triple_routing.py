@@ -14,8 +14,6 @@ IMAGE_NAME = "flipperthedog/emqx-ip"
 
 
 class LinuxRouter(Node):
-    "A Node with IP forwarding enabled."
-
     def config(self, **params):
         super(LinuxRouter, self).config(**params)
         # Enable forwarding on the router
@@ -114,7 +112,7 @@ def run():
 
     info('*** Adding host-switch link\n')
     for d, s in [(d1, s1), (d2, s2), (d3, s3)]:
-        net.addLink(d, s)
+        print(net.addLink(d, s))
 
     info('*** Starting network\n')
     net.start()

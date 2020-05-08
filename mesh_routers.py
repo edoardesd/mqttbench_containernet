@@ -42,9 +42,9 @@ def arg_parse():
     parser = argparse.ArgumentParser(description='MQTT cluster simulation')
     parser.add_argument('-t', '--type', dest='cluster_type', default='emqx',
                         help='broker type (EMQX, RABBITMQ, VERNEMQ, HIVEMQ)')
-    parser.add_argument('-d', '--delay_r', dest='router_delay', default=DELAY,
+    parser.add_argument('-d', '--delay-routers', dest='router_delay', default=DELAY,
                         help='delay over a router link', type=int)
-    parser.add_argument('-c', '--delay-container', dest='container_delay', default=DELAY,
+    parser.add_argument('-c', '--delay-containers', dest='container_delay', default=DELAY,
                         help='delay over a switch-container link', type=int)
     
     return parser.parse_args()

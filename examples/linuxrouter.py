@@ -35,27 +35,25 @@ from mininet.log import setLogLevel, info
 from mininet.cli import CLI
 from mininet.link import TCLink
 
-
 IMAGE_NAME = "flipperthedog/emqx-ip"
 
 
-class LinuxRouter( Node ):
+class LinuxRouter(Node):
     "A Node with IP forwarding enabled."
 
-    def config( self, **params ):
-        super( LinuxRouter, self).config( **params )
+    def config(self, **params):
+        super(LinuxRouter, self).config(**params)
         # Enable forwarding on the router
-        self.cmd( 'sysctl net.ipv4.ip_forward=1' )
+        self.cmd('sysctl net.ipv4.ip_forward=1')
 
-    def terminate( self ):
-        self.cmd( 'sysctl net.ipv4.ip_forward=0' )
-        super( LinuxRouter, self ).terminate()
-
+    def terminate(self):
+        self.cmd('sysctl net.ipv4.ip_forward=0')
+        super(LinuxRouter, self).terminate()
 
 
 def run():
     "Test linux router"
-    net = Containernet ( controller=Controller )  # controller is used by s1-s3
+    net = Containernet(controller=Controller)  # controller is used by s1-s3
     net.addController('c0', port=6654)
 
     defaultIP = '10.0.0.1/24'  # IP address for r0-eth1
@@ -64,21 +62,23 @@ def run():
     s1, s2, s3 = [net.addSwitch(s) for s in ('s1', 's2', 's3')]
 
     net.addLink(s1, router, intfName2='r0-eth1',
-                 params2={'ip': defaultIP})  # for clarity
+                params2={'ip': defaultIP})
     net.addLink(s2, router, intfName2='r0-eth2',
-                 params2={'ip': '10.0.1.1/24'})
+                params2={'ip': '10.0.1.1/24'})
     net.addLink(s3, router, intfName2='r0-eth3',
-                 params2={'ip': '10.0.2.1/24'})
+                params2={'ip': '192.0.2.1/24'})
 
-    d1 = net.addDocker(name='d1', ip='10.0.0.251/24', defaultRoute='via 10.0.0.1', ports=[1883], port_bindings={1883: 1883}, dimage=IMAGE_NAME,
-                   environment={"EMQX_NAME": "docker1",
-                                "EMQX_HOST": "10.0.0.251",
-                                "EMQX_NODE__DIST_LISTEN_MAX": 6379,
-                                "EMQX_LISTENER__TCP__EXTERNAL": 1883,
-                                "EMQX_CLUSTER__DISCOVERY": "static",
-                                "EMQX_CLUSTER__STATIC__SEEDS": "docker2@10.0.1.252"})
+    d1 = net.addDocker(name='d1', ip='10.0.0.251/24', defaultRoute='via 10.0.0.1', ports=[1883],
+                       port_bindings={1883: 1883}, dimage=IMAGE_NAME,
+                       environment={"EMQX_NAME": "docker1",
+                                    "EMQX_HOST": "10.0.0.251",
+                                    "EMQX_NODE__DIST_LISTEN_MAX": 6379,
+                                    "EMQX_LISTENER__TCP__EXTERNAL": 1883,
+                                    "EMQX_CLUSTER__DISCOVERY": "static",
+                                    "EMQX_CLUSTER__STATIC__SEEDS": "docker2@10.0.1.252"})
 
-    d2 = net.addDocker(name='d2', ip='10.0.1.252/24', defaultRoute='via 10.0.1.1', ports=[1883], port_bindings={1883: 1884}, dimage=IMAGE_NAME,
+    d2 = net.addDocker(name='d2', ip='10.0.1.252/24', defaultRoute='via 10.0.1.1', ports=[1883],
+                       port_bindings={1883: 1884}, dimage=IMAGE_NAME,
                        environment={"EMQX_NAME": "docker2",
                                     "EMQX_HOST": "10.0.1.252",
                                     "EMQX_NODE__DIST_LISTEN_MAX": 6379,
@@ -86,10 +86,10 @@ def run():
                                     "EMQX_CLUSTER__DISCOVERY": "static",
                                     "EMQX_CLUSTER__STATIC__SEEDS": "docker1@10.0.0.251"})
 
-    d3 = net.addDocker(name='d3', ip='10.0.2.253/24', defaultRoute='via 10.0.2.1', ports=[1883],
+    d3 = net.addDocker(name='d3', ip='192.0.2.253/24', defaultRoute='via 192.0.2.1', ports=[1883],
                        port_bindings={1883: 1885}, dimage=IMAGE_NAME,
                        environment={"EMQX_NAME": "docker3",
-                                    "EMQX_HOST": "10.0.2.253",
+                                    "EMQX_HOST": "192.0.2.253",
                                     "EMQX_NODE__DIST_LISTEN_MAX": 6379,
                                     "EMQX_LISTENER__TCP__EXTERNAL": 1883,
                                     "EMQX_CLUSTER__DISCOVERY": "static",
@@ -105,8 +105,8 @@ def run():
     info('*** Testing connectivity\n')
     net.pingAll()
 
-    info( '*** Routing Table on Router:\n' )
-    print((net[ 'r0' ].cmd( 'route' )))
+    info('*** Routing Table on Router:\n')
+    print((net['r0'].cmd('route')))
 
     info('*** Starting brokers\n')
     d1.start()
@@ -118,5 +118,5 @@ def run():
 
 
 if __name__ == '__main__':
-    setLogLevel( 'info' )
+    setLogLevel('info')
     run()
