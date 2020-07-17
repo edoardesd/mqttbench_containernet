@@ -89,7 +89,7 @@ def main():
     #     if any("sub" not in s for s in active_list):
     #         print("exit")
     #         sys.exit(-9)
-    time.sleep(150)
+    #time.sleep(150)
     # container_1.stop()
 
 
