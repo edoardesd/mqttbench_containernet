@@ -196,7 +196,7 @@ def run():
     info('*** Adding switches\n')
     switch_list = [net.addSwitch('s{}'.format(s)) for s in range(TOTAL_BROKERS)]
 
-    info('*** Adding host-switch links\n')
+    info('*** Adding router-switch links\n')
     for count, (s, r, n) in enumerate(zip(switch_list, router_list, router_networks)):
         print(net.addLink(s, r, intfName2='r{}-eth0'.format(count), params2={'ip': n}))
 
@@ -304,12 +304,33 @@ def main():
     for c, s in zip(container_list, s_list):
         print(net.addLink(c, s, cls=TCLink, delay='{}ms'.format(args.container_delay)))
 
+    info('\n*** Adding pub/sub containers\n')
+    middle_switch = [net.addSwitch('middle{}'.format(s)) for s in range(TOTAL_BROKERS)]
+
+    #creating subs
+    sub_list = []
+    for indx, ip_addr in enumerate(ip_routers):
+        sub = net.addDocker('sub_{}'.format(indx), ip='{}/24'.format(ip_addr[111].compressed),
+                            dimage='flipperthedog/sub_client:latest')
+        sub_list.append(sub)
+
+    # switch sub link
+    # for sw, sb in zip(middle_switch, sub_list):
+    #     print(net.addLink(sw, sb))
+    #
+    # # switch - broker link, with a new interface for the broker
+    # for indx, (sw, cnt, ip_addr) in enumerate(zip(middle_switch, container_list, ip_routers)):
+    #     print(cnt, ip_addr)
+    #     print(net.addLink(sw, cnt, intfName2='{}-eth1'.format(cnt), params2={'ip': '{}/24'.format(ip_addr[100].compressed)}))
+
     info('\n*** Starting network\n')
     net.start()
     # net.staticArp()
 
     info('\n*** Testing connectivity\n')
-    net.pingAll()
+    # net.pingAll()
+    # for sb, cnt in zip(sub_list, container_list):
+    #     net.ping([sb, cnt])
 
     info('\n*** Waiting the network start up ({} secs)...\n'.format(args.router_delay / 2))
     time.sleep(args.router_delay / 2)
