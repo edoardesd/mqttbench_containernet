@@ -146,7 +146,8 @@ def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route):
                              "DOCKER_VERNEMQ_NODENAME": cont_address[:-3],
                              "DOCKER_VERNEMQ_DISCOVERY_NODE": master_node[master_node.index("@") + 1:-3],
                              "DOCKER_VERNEMQ_ACCEPT_EULA": "yes",
-                             "DOCKER_VERNEMQ_ALLOW_ANONYMOUS": "on"
+                             "DOCKER_VERNEMQ_ALLOW_ANONYMOUS": "on",
+                             "DOCKER_VERNEMQ_LISTENER.tcp.containernet": cont_address[:-3]+":1883"
                          })
 
 
@@ -169,7 +170,6 @@ def create_containers(argument, router_ips):
 
     for count, ip in enumerate(router_ips):
         default_route = ip[1].compressed
-        print(default_route)
         container_name = "{}_{}".format(args.cluster_type, count)
         local_address = "{}/24".format(ip[100].compressed)
         bind_addr = 1880 + count
