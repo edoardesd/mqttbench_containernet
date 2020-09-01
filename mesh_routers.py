@@ -10,6 +10,7 @@ from mininet.log import debug, info, error, setLogLevel
 import argparse
 from shutil import copyfile
 import ipaddress
+import itertools
 import os
 import time
 import xml.etree.ElementTree as ET
@@ -46,7 +47,7 @@ def arg_parse():
                         help='delay over a router link', type=int)
     parser.add_argument('-c', '--delay-containers', dest='container_delay', default=DELAY,
                         help='delay over a switch-container link', type=int)
-    
+
     return parser.parse_args()
 
 
@@ -60,7 +61,7 @@ def start_emqx(cont_name, cont_address, bind_ip, master_node, default_route):
                                       "EMQX_NODE__DIST_LISTEN_MAX": 6379,
                                       "EMQX_LISTENER__TCP__EXTERNAL": 1883,
                                       "EMQX_CLUSTER__DISCOVERY": "static",
-                                      "EMQX_CLUSTER__STATIC__SEEDS": master_node
+                                      "EMQX_CLUSTER__STATIC__SEEDS": master_node[:-3]
                                       })
 
 
@@ -73,6 +74,7 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route)
             _ip = "{}{}.100/24".format(IP_ADDR, i)
             if _ip != cont_address:
                 c += 1
+                print("cluster_formation.classic_config.nodes.{} = rabbit@rabbitmq_{}\n".format(c, i))
                 f.write("cluster_formation.classic_config.nodes.{} = rabbit@rabbitmq_{}\n".format(c, i))
 
     d = net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
@@ -179,7 +181,7 @@ def create_containers(argument, router_ips):
     return local_list
 
 
-def run():
+def core_network():
     info('\n*** Adding controller')
     net.addController('c0', port=6654)
     info('  DONE\n')
@@ -284,7 +286,7 @@ def run():
     router_list[4].cmd("ip route add 10.0.2.0/24 via 10.31.0.1 dev r4-eth3")
     router_list[4].cmd("ip route add 10.0.3.0/24 via 10.40.0.1 dev r4-eth4")
 
-    return switch_list, networks
+    return switch_list, networks, router_list
 
 
 def main():
@@ -295,7 +297,7 @@ def main():
     info('\n\tDELAY: router: {} switch: {}'.format(args.router_delay, args.container_delay))
     info('\n')
 
-    s_list, ip_routers = run()
+    s_list, ip_routers, rout_list = core_network()
 
     info('\n*** Adding docker containers, type: {}\n'.format(args.cluster_type.upper()))
     container_list = create_containers(args.cluster_type.upper(), ip_routers)
@@ -304,24 +306,25 @@ def main():
     for c, s in zip(container_list, s_list):
         print(net.addLink(c, s, cls=TCLink, delay='{}ms'.format(args.container_delay)))
 
-    info('\n*** Adding pub/sub containers\n')
-    middle_switch = [net.addSwitch('middle{}'.format(s)) for s in range(TOTAL_BROKERS)]
+    # info('\n*** Adding pub/sub containers\n')
+    # middle_switch = [net.addSwitch('middle{}'.format(s)) for s in range(TOTAL_BROKERS)]
 
-    #creating subs
+    # #creating subs
     sub_list = []
     for indx, ip_addr in enumerate(ip_routers):
         sub = net.addDocker('sub_{}'.format(indx), ip='{}/24'.format(ip_addr[111].compressed),
+                            # ip='10.0.0.25{}'.format(indx),
                             dimage='flipperthedog/sub_client:latest')
         sub_list.append(sub)
 
     # switch sub link
-    # for sw, sb in zip(middle_switch, sub_list):
-    #     print(net.addLink(sw, sb))
-    #
-    # # switch - broker link, with a new interface for the broker
+    for sw, sb in zip(s_list, sub_list):
+        print(net.addLink(sw, sb))
+
+    # switch - broker link, with a new interface for the broker
     # for indx, (sw, cnt, ip_addr) in enumerate(zip(middle_switch, container_list, ip_routers)):
-    #     print(cnt, ip_addr)
-    #     print(net.addLink(sw, cnt, intfName2='{}-eth1'.format(cnt), params2={'ip': '{}/24'.format(ip_addr[100].compressed)}))
+    #     print(cnt, ip_addr, ip_addr[100].compressed)
+    #     print(net.addLink(sw, cnt, intfName2='{}-eth1'.format(cnt), params2={'ip': '{}/24'.format(ip_addr[200].compressed)}))
 
     info('\n*** Starting network\n')
     net.start()
@@ -329,8 +332,11 @@ def main():
 
     info('\n*** Testing connectivity\n')
     # net.pingAll()
-    # for sb, cnt in zip(sub_list, container_list):
-    #     net.ping([sb, cnt])
+    for sb, cnt in zip(sub_list, container_list):
+        net.ping([sb, cnt])
+
+    for pairs in list(itertools.permutations(rout_list + container_list, 2)):
+        net.ping(pairs)
 
     info('\n*** Waiting the network start up ({} secs)...\n'.format(args.router_delay / 2))
     time.sleep(args.router_delay / 2)
