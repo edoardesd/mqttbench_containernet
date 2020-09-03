@@ -47,6 +47,8 @@ def arg_parse():
                         help='delay over a router link', type=int)
     parser.add_argument('-c', '--delay-containers', dest='container_delay', default=DELAY,
                         help='delay over a switch-container link', type=int)
+    parser.add_argument('-s', '--attach-subs', dest='attach_subs', default=False,
+                        action='store_true', help='include subscribers in the simulation')
 
     return parser.parse_args()
 
@@ -170,7 +172,7 @@ def create_containers(argument, router_ips):
 
     for count, ip in enumerate(router_ips):
         default_route = ip[1].compressed
-        container_name = "{}_{}".format(args.cluster_type, count)
+        container_name = "{}{}".format(args.cluster_type, count)
         local_address = "{}/24".format(ip[100].compressed)
         bind_addr = 1880 + count
         if my_master is None:
@@ -310,33 +312,48 @@ def main():
     # middle_switch = [net.addSwitch('middle{}'.format(s)) for s in range(TOTAL_BROKERS)]
 
     # #creating subs
-    sub_list = []
-    for indx, ip_addr in enumerate(ip_routers):
-        sub = net.addDocker('sub_{}'.format(indx), ip='{}/24'.format(ip_addr[111].compressed),
-                            # ip='10.0.0.25{}'.format(indx),
-                            dimage='flipperthedog/sub_client:latest')
-        sub_list.append(sub)
+    if args.attach_subs:
+        info('\n*** Adding subscribers\n')
+        sub_list = []
+        for indx, ip_addr in enumerate(ip_routers):
+            sub = net.addDocker('sub{}'.format(indx), ip='{}/24'.format(ip_addr[111].compressed),
+                                # ip='10.0.0.25{}'.format(indx),
+                                dimage='flipperthedog/alpine_client:latest')
+            sub_list.append(sub)
 
-    # switch sub link
-    for sw, sb in zip(s_list, sub_list):
-        print(net.addLink(sw, sb))
+        # switch sub link
+        for sw, sb in zip(s_list, sub_list):
+            print(net.addLink(sw, sb))
 
-    # switch - broker link, with a new interface for the broker
-    # for indx, (sw, cnt, ip_addr) in enumerate(zip(middle_switch, container_list, ip_routers)):
-    #     print(cnt, ip_addr, ip_addr[100].compressed)
-    #     print(net.addLink(sw, cnt, intfName2='{}-eth1'.format(cnt), params2={'ip': '{}/24'.format(ip_addr[200].compressed)}))
+        info('\n*** Adding publishers\n')
+        pub_list = []
+        for indx, ip_addr in enumerate(ip_routers):
+            pub = net.addDocker('pub{}'.format(indx), ip='{}/24'.format(ip_addr[112].compressed),
+                                # ip='10.0.0.25{}'.format(indx),
+                                dimage='flipperthedog/alpine_client:latest')
+            pub_list.append(pub)
+
+        # switch pub link
+        for sw, pb in zip(s_list, pub_list):
+            print(net.addLink(sw, pb))
+
 
     info('\n*** Starting network\n')
     net.start()
     # net.staticArp()
 
     info('\n*** Testing connectivity\n')
-    # net.pingAll()
-    for sb, cnt in zip(sub_list, container_list):
-        net.ping([sb, cnt])
+    if not args.attach_subs:
+        net.pingAll()
+    else:
+        for sb, cnt in zip(sub_list, container_list):
+            net.ping([sb, cnt])
 
-    for pairs in list(itertools.permutations(rout_list + container_list, 2)):
-        net.ping(pairs)
+        for pb, cnt in zip(pub_list, container_list):
+            net.ping([pb, cnt])
+
+        for pairs in list(itertools.permutations(rout_list + container_list, 2)):
+            net.ping(pairs)
 
     info('\n*** Waiting the network start up ({} secs)...\n'.format(args.router_delay / 2))
     time.sleep(args.router_delay / 2)
