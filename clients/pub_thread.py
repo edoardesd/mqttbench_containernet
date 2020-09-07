@@ -7,7 +7,7 @@ from datetime import datetime
 
 
 def arg_parse():
-    parser = argparse.ArgumentParser(description='MQTT thread subscriber', add_help=False)
+    parser = argparse.ArgumentParser(description='MQTT thread publisher', add_help=False)
     parser.add_argument('-h', '--host', dest='host', default='10.0.1.100',
                         help='broker host name (e.g. 10.0.0.100)')
     parser.add_argument('-t', '--topic', dest='topic', default='test',
@@ -23,61 +23,42 @@ def arg_parse():
     return parser.parse_args()
 
 
-class Receiver(threading.Thread):
+class Sender(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
-        self.is_running = True
-        self.counter = 0
-        self.result = []
-
-    def on_message(self, client, userdata, message):
-        self.result.append("{}) {}, {}, {}, {}".format(self.counter, args.host, client._client_id, str(message.payload.decode("utf-8")),
-                                         datetime.now().strftime("%H:%M:%S.%f")[:-3],
-                                         message.qos))
-        self.counter += 1
-        if self.counter >= args.msg_num*args.clients_num:
-            self.is_running = False
 
     def run(self):
-        client = mqtt.Client("sub"+self.name)
-        client.on_message = self.on_message
+        client = mqtt.Client("pub_"+self.name)
         client.connect(args.host)
         print("Client {} connected to {}".format(client._client_id, args.host))
-        client.subscribe(args.topic, args.qos)
-        client.loop_start()
-        while self.is_running:
-            pass
+        for i in range(0, args.msg_num):
+            now = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+            client.publish(args.topic, str(now), qos=args.qos)
+            print("{}) published {}".format(i, now))
 
-        with open(file_name, "a") as f:
-            f.write("\n".join(self.result))
-            f.write("\n")
+            time.sleep(1)
 
 
 def main():
     clients = []
     for cl in range(0, args.clients_num):
-        t_mqtt = Receiver()
+        t_mqtt = Sender()
         t_mqtt.setDaemon(True)
         clients.append(t_mqtt)
-
-    with open(file_name, "a") as f:
-        f.write("broker, client, sent, received, qos\n")
 
     for x in clients:
         x.start()
 
-    time.sleep(.5)
-    print(" ")
-    print("Wait...")
+    time.sleep(1)
+
     for x in clients:
         x.join()
 
-    print("SUB DONE")
-    # sys.exit(1)
+    print("PUB DONE")
+    sys.exit(1)
 
 
 if __name__ == "__main__":
     args = arg_parse()
     counter_msg = 0
-    file_name = datetime.now().strftime("%m-%d-%H%M%S")+".txt"
     main()
