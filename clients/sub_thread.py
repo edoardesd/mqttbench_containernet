@@ -4,6 +4,11 @@ import sys
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
+
+
+FOLDER = "experiments/"
+
 
 
 def arg_parse():
@@ -28,28 +33,49 @@ class Receiver(threading.Thread):
         threading.Thread.__init__(self)
         self.is_running = True
         self.counter = 0
-        self.result = []
+        self.e2e_result = []
+        self.connect_start = 0
+        self.connect_result = []
 
     def on_message(self, client, userdata, message):
-        self.result.append("{}) {}, {}, {}, {}".format(self.counter, args.host, client._client_id, str(message.payload.decode("utf-8")),
-                                         datetime.now().strftime("%H:%M:%S.%f")[:-3],
-                                         message.qos))
+        self.e2e_result.append("{}, {}, {}, {}".format(args.host, client._client_id, str(message.payload.decode("utf-8")),
+                                                   datetime.now().strftime("%H:%M:%S.%f")[:-3],
+                                                       message.qos))
+
         self.counter += 1
-        if self.counter >= args.msg_num*args.clients_num:
+        if self.counter % 10 == 0:
+            print(".", end='', flush=True)
+
+        if self.counter >= args.msg_num * args.clients_num:
             self.is_running = False
 
-    def run(self):
-        client = mqtt.Client("sub"+self.name)
-        client.on_message = self.on_message
-        client.connect(args.host)
+    def on_connect(self, client, userdata, flags, rc):
         print("Client {} connected to {}".format(client._client_id, args.host))
+
+        self.connect_result.append("{}, {}, {}, {}".format(args.host, client._client_id, self.connect_start,
+                                           datetime.now().strftime("%H:%M:%S.%f")[:-3]))
+
         client.subscribe(args.topic, args.qos)
+
+    def run(self):
+        client = mqtt.Client("sub" + self.name)
+
+        client.on_message = self.on_message
+        client.on_connect = self.on_connect
+
+        self.connect_start = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        client.connect(args.host)
         client.loop_start()
+
         while self.is_running:
             pass
 
-        with open(file_name, "a") as f:
-            f.write("\n".join(self.result))
+        with open(nested_folder+"/e2e"+file_name, "a") as f:
+            f.write("\n".join(self.e2e_result))
+            f.write("\n")
+
+        with open(nested_folder+"/conn"+file_name, "a") as f:
+            f.write("\n".join(self.connect_result))
             f.write("\n")
 
 
@@ -60,24 +86,32 @@ def main():
         t_mqtt.setDaemon(True)
         clients.append(t_mqtt)
 
-    with open(file_name, "a") as f:
+    with open(nested_folder+"/e2e"+file_name, "a") as f:
         f.write("broker, client, sent, received, qos\n")
+
+    with open(nested_folder+"/conn" + file_name, "a") as f:
+        f.write("broker, client, conn, connack\n")
 
     for x in clients:
         x.start()
 
     time.sleep(.5)
     print(" ")
-    print("Wait...")
+    print("Wait", end='', flush=True)
+
     for x in clients:
         x.join()
 
     print("SUB DONE")
-    # sys.exit(1)
+    time.sleep(1)
+    sys.exit(1)
 
 
 if __name__ == "__main__":
+    print("SUB CLIENT THREADED VERSION")
     args = arg_parse()
-    counter_msg = 0
-    file_name = datetime.now().strftime("%m-%d-%H%M%S")+".txt"
+    file_name = datetime.now().strftime("%H%M%S") + ".txt"
+    nested_folder = FOLDER + datetime.now().strftime("%m%d")
+    Path(nested_folder).mkdir(parents=True, exist_ok=True)
+
     main()

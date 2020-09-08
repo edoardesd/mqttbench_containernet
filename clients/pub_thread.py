@@ -18,6 +18,8 @@ def arg_parse():
                         help='number of messages per client', type=int)
     parser.add_argument('-c', '--clients-num', dest='clients_num', default=10,
                         help='number of different clients', type=int)
+    parser.add_argument('-d', '--delay', dest='delay', default=1,
+                        help='delay between pubblications', type=int)
     # parser.print_help()
 
     return parser.parse_args()
@@ -26,25 +28,25 @@ def arg_parse():
 class Sender(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
+        self.client = mqtt.Client("pub_" + self.name)
 
     def run(self):
-        client = mqtt.Client("pub_"+self.name)
-        client.connect(args.host)
-        print("Client {} connected to {}".format(client._client_id, args.host))
+        self.client.connect(args.host)
+        print("Client {} connected to {}".format(self.client._client_id, args.host))
         for i in range(0, args.msg_num):
-            now = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-            client.publish(args.topic, str(now), qos=args.qos)
+            now = str(datetime.now().strftime("%H:%M:%S.%f")[:-3])
+            self.client.publish(args.topic, now, qos=args.qos)
             print("{}) published {}".format(i, now))
 
-            time.sleep(1)
+            time.sleep(args.delay)
 
 
 def main():
     clients = []
     for cl in range(0, args.clients_num):
-        t_mqtt = Sender()
-        t_mqtt.setDaemon(True)
-        clients.append(t_mqtt)
+        t = Sender()
+        t.setDaemon(True)
+        clients.append(t)
 
     for x in clients:
         x.start()
@@ -60,5 +62,4 @@ def main():
 
 if __name__ == "__main__":
     args = arg_parse()
-    counter_msg = 0
     main()
