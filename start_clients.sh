@@ -1,22 +1,33 @@
 #!/usr/bin/env bash
 
-docker exec -t mn.sub0 mosquitto_sub -h 10.0.0.100 -t test -q 2 -d -v | xargs -d$'\n' -L1 bash -c 'date "+%Y-%m-%d %T.%3N ---- $0"'  | tee test0.txt &
-pid[0]=$!
-docker exec -t mn.sub1 mosquitto_sub -h 10.0.1.100 -t test -q 2 -d -v | xargs -d$'\n' -L1 bash -c 'date "+%Y-%m-%d %T.%3N ---- $0"'  | tee test1.txt &
-pid[1]=$!
-docker exec -t mn.sub2 mosquitto_sub -h 10.0.2.100 -t test -q 2 -d -v | xargs -d$'\n' -L1 bash -c 'date "+%Y-%m-%d %T.%3N ---- $0"'  | tee test2.txt &
-pid[2]=$!
-docker exec -t mn.sub3 mosquitto_sub -h 10.0.3.100 -t test -q 2 -d -v | xargs -d$'\n' -L1 bash -c 'date "+%Y-%m-%d %T.%3N ---- $0"'  | tee test3.txt &
-pid[3]=$!
-docker exec -t mn.sub4 mosquitto_sub -h 10.0.4.100 -t test -q 2 -d -v | xargs -d$'\n' -L1 bash -c 'date "+%Y-%m-%d %T.%3N ---- $0"'  | tee test4.txt &
-pid[4]=$!
+docker stats --format \
+    "{\"{{ .Name }}\": {\"memory\":{\"raw\":\"{{ .MemUsage }}\",\"percent\":\"{{ .MemPerc }}\"},\"cpu\":\"{{ .CPUPerc }}\",\"netIO\":\"{{.NetIO}}\"}}}"   | ts "{\"%F-%H:%M:%S\": " > experiments/file.txt &
+FILE_PID=$!
 
-#docker exec -t mn.pub0 python simple_pub.py -h 10.0.0.100 -t test -q 2 &
-#docker exec -t mn.pub1 python simple_pub.py -h 10.0.1.100 -t test -q 2 &
-#docker exec -t mn.pub2 python simple_pub.py -h 10.0.2.100 -t test -q 2 &
-#docker exec -t mn.pub3 python simple_pub.py -h 10.0.3.100 -t test -q 2 &
-#docker exec -t mn.pub4 python simple_pub.py -h 10.0.4.100 -t test -q 2 &
+sudo tcpdump -i s0-eth1 src 10.0.0.100 -w tcp0.pcap &
+sudo tcpdump -i s1-eth1 src 10.0.1.100 -w tcp1.pcap &
+sudo tcpdump -i s2-eth1 src 10.0.2.100 -w tcp2.pcap &
+sudo tcpdump -i s3-eth1 src 10.0.3.100 -w tcp3.pcap &
+sudo tcpdump -i s4-eth1 src 10.0.4.100 -w tcp4.pcap &
 
-sleep 2
-#trap "kill ${pid[0]} ${pid[1]} ${pid[2]} ${pid[3]} ${pid[4]}; exit 1" INT
-wait
+sleep 10
+
+docker exec -t mn.sub0 python sub_thread.py -h 10.0.0.100 -t test -q 2 -m 40 -c 1 &
+docker exec -t mn.sub1 python sub_thread.py -h 10.0.1.100 -t test -q 2 -m 40 -c 1 &
+docker exec -t mn.sub2 python sub_thread.py -h 10.0.2.100 -t test -q 2 -m 40 -c 1 &
+docker exec -t mn.sub3 python sub_thread.py -h 10.0.3.100 -t test -q 2 -m 40 -c 1 &
+docker exec -t mn.sub4 python sub_thread.py -h 10.0.4.100 -t test -q 2 -m 40 -c 1 &
+
+docker exec -t mn.pub0 python pub_thread.py -h 10.0.0.100 -t test -q 2 -m 10 -c 1 -d 1 &
+docker exec -t mn.pub1 python pub_thread.py -h 10.0.1.100 -t test -q 2 -m 10 -c 1 -d 1 &
+docker exec -t mn.pub2 python pub_thread.py -h 10.0.2.100 -t test -q 2 -m 10 -c 1 -d 1 &
+docker exec -t mn.pub3 python pub_thread.py -h 10.0.3.100 -t test -q 2 -m 10 -c 1 -d 1 &
+docker exec -t mn.pub4 python pub_thread.py -h 10.0.4.100 -t test -q 2 -m 10 -c 1 -d 1 &
+BACK_PID=$!
+
+wait $BACK_PID
+
+sleep 5
+kill -9 $FILE_PID
+sudo killall -9 tcpdump
+echo "diocane"
