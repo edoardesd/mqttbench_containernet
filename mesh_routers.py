@@ -45,7 +45,7 @@ def arg_parse():
                         help='broker type (EMQX, RABBITMQ, VERNEMQ, HIVEMQ)')
     parser.add_argument('-d', '--delay-routers', dest='router_delay', default=DELAY,
                         help='delay over a router link', type=int)
-    parser.add_argument('-c', '--delay-containers', dest='container_delay', default=DELAY,
+    parser.add_argument('-c', '--delay-switch', dest='container_delay', default=DELAY,
                         help='delay over a switch-container link', type=int)
     parser.add_argument('-s', '--attach-subs', dest='attach_subs', default=False,
                         action='store_true', help='include subscribers in the simulation')
@@ -317,8 +317,9 @@ def main():
         sub_list = []
         for indx, ip_addr in enumerate(ip_routers):
             sub = net.addDocker('sub{}'.format(indx), ip='{}/24'.format(ip_addr[111].compressed),
-                                # ip='10.0.0.25{}'.format(indx),
-                                dimage='flipperthedog/alpine_client:latest')
+                                dimage='flipperthedog/alpine_client:latest',
+                                volumes=[PWD+'/experiments'
+                                         ':/home/ubuntu/experiments'])
             sub_list.append(sub)
 
         # switch sub link
@@ -329,8 +330,7 @@ def main():
         pub_list = []
         for indx, ip_addr in enumerate(ip_routers):
             pub = net.addDocker('pub{}'.format(indx), ip='{}/24'.format(ip_addr[112].compressed),
-                                # ip='10.0.0.25{}'.format(indx),
-                                dimage='flipperthedog/alpine_client:latest')
+                                dimage='flipperthedog/go_publisher:bash')
             pub_list.append(pub)
 
         # switch pub link
