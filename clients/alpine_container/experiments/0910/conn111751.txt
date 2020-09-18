@@ -1,2 +1,0 @@
-broker, client, conn, connack
-172.17.0.2, b'subThread-1-xccdui', 11:17:51.932, 11:17:51.955

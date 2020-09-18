@@ -1,2 +1,0 @@
-broker, client, conn, connack
-172.17.0.2, b'subThread-1-ymacux', 11:00:35.929, 11:00:36.075
