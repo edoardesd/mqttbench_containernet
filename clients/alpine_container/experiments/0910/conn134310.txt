@@ -1,0 +1,2 @@
+broker, client, conn, connack
+172.17.0.3, b'subThread-1-hjtzmx', 1599738190170, 1599738190193

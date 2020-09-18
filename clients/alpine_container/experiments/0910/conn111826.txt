@@ -1,0 +1,2 @@
+broker, client, conn, connack
+172.17.0.2, b'subThread-1-hzvxzc', 11:18:26.315, 11:18:26.338

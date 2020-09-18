@@ -20,7 +20,8 @@ RUN pip install paho-mqtt
 
 WORKDIR /home/ubuntu
 
-COPY . /home/ubuntu
+COPY sub_thread.py /home/ubuntu/sub_thread.py
+COPY pub_thread.py /home/ubuntu/pub_thread.py
 
 #CMD ["/usr/local/bin/python3", "-u", "container_python.py"]
 

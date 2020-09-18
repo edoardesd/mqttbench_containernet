@@ -31,16 +31,27 @@ class Sender(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
         self.client = mqtt.Client("pub_" + self.name + '-' + ''.join(random.choice(string.ascii_lowercase) for i in range(6)))
+        self.messages_published = 0
+        self.is_running = True
+
+    def publish_periodic(self):
+        now = str(datetime.now().strftime("%H:%M:%S.%f")[:-3])
+        self.client.publish(args.topic, now, qos=args.qos, retain=False)
+        print("{}) published {}".format(self.messages_published, now))
+        self.messages_published += 1
+
+        if self.messages_published < args.msg_num:
+            threading.Timer(args.delay, self.publish_periodic).start()
+        else:
+            self.is_running = False
 
     def run(self):
         self.client.connect(args.host)
         print("Client {} connected to {}".format(self.client._client_id, args.host))
-        for i in range(0, args.msg_num):
-            now = str(datetime.now().strftime("%H:%M:%S.%f")[:-3])
-            self.client.publish(args.topic, now, qos=args.qos)
-            print("{}) published {}".format(i, now))
 
-            time.sleep(args.delay)
+        self.publish_periodic()
+        while self.is_running:
+            pass
 
 
 def main():

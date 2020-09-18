@@ -1,0 +1,2 @@
+broker, client, conn, connack
+172.17.0.3, b'subThread-1-mzmlsw', 1599738411969.2012, 1599738411989.697
