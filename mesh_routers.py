@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import math
 
 from mininet.net import Containernet
 from mininet.node import Controller
@@ -20,6 +21,8 @@ VERSION = 1
 TOTAL_BROKERS = 5
 DELAY = 10
 IP_ADDR = '10.0.'
+CPU_VBOX = 6
+CPU_ANTLAB = 12
 IMAGES = {
     "EMQX": "flipperthedog/emqx-ip:latest",
     "VERNEMQ": "francigjeci/vernemq-debian:latest",
@@ -51,16 +54,19 @@ def arg_parse():
                         action='store_true', help='include subscribers in the simulation')
     parser.add_argument('--ram-limit', dest='ram_limit', default='2g',
                         help='ram memory of the brokers')
+    parser.add_argument('--cpu', dest='cpu', default=False, action='store_true',
+                        help='use 16 cores machine')
 
     return parser.parse_args()
 
 
-def start_emqx(cont_name, cont_address, bind_ip, master_node, default_route):
+def start_emqx(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
     return net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
                          defaultRoute='via {}'.format(default_route),
                          dimage=IMAGES["EMQX"],
                          ports=[1883], port_bindings={1883: bind_ip},
                          mem_limit=args.ram_limit,
+                         cpuset_cpus=cpu,
                          environment={"EMQX_NAME": cont_name,
                                       "EMQX_HOST": cont_address[:-3],
                                       "EMQX_NODE__DIST_LISTEN_MAX": 6379,
@@ -70,7 +76,7 @@ def start_emqx(cont_name, cont_address, bind_ip, master_node, default_route):
                                       })
 
 
-def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route):
+def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
     dest_file = "{}/confiles/rabbitmq_{}.conf".format(PWD, cont_address[5:-7])
     copyfile(PWD + "/confiles/rabbitmq.conf", dest_file)
     with open(dest_file, "a") as f:
@@ -101,7 +107,7 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route)
     return d
 
 
-def start_hivemq(cont_name, cont_address, bind_ip, master_node, default_route):
+def start_hivemq(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
     my_id = cont_address[5:-7]
     source_config_file_path = os.path.join(PWD, 'confiles/config-dns.xml')
     dest_file = "{}/confiles/config-dns_{}.xml".format(PWD, my_id)
@@ -144,7 +150,7 @@ def start_hivemq(cont_name, cont_address, bind_ip, master_node, default_route):
                              })
 
 
-def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route):
+def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
     return net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
                          defaultRoute='via {}'.format(default_route),
                          dimage=IMAGES["VERNEMQ"],
@@ -155,12 +161,23 @@ def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route):
                              "DOCKER_VERNEMQ_DISCOVERY_NODE": master_node[master_node.index("@") + 1:-3],
                              "DOCKER_VERNEMQ_ACCEPT_EULA": "yes",
                              "DOCKER_VERNEMQ_ALLOW_ANONYMOUS": "on",
-                             "DOCKER_VERNEMQ_LISTENER.tcp.containernet": cont_address[:-3]+":1883"
+                             "DOCKER_VERNEMQ_LISTENER.tcp.containernet": cont_address[:-3] + ":1883"
                          })
 
 
 def invalid(broker):
     info('Invalid {}'.format(broker))
+
+
+def assign_cpu(core_num, core_list):
+    core_per_broker = math.floor(core_num/TOTAL_BROKERS)
+
+    this_cpu = []
+    print(core_list, core_per_broker)
+    for i in range(core_per_broker):
+        this_cpu.append(core_list.pop(0))
+
+    return ','.join(map(str, this_cpu))
 
 
 def create_containers(argument, router_ips):
@@ -176,6 +193,11 @@ def create_containers(argument, router_ips):
 
     my_master = None
 
+    cpu_use = CPU_VBOX
+    if args.cpu:
+        cpu_use = CPU_ANTLAB
+
+    core_list = list(range(0, cpu_use))
     for count, ip in enumerate(router_ips):
         default_route = ip[1].compressed
         container_name = "{}{}".format(args.cluster_type, count)
@@ -184,7 +206,8 @@ def create_containers(argument, router_ips):
         if my_master is None:
             my_master = "{}@{}".format(container_name, local_address)
 
-        local_list.append(func(container_name, local_address, bind_addr, my_master, default_route))
+        core_to_use = assign_cpu(cpu_use, core_list)
+        local_list.append(func(container_name, local_address, bind_addr, my_master, default_route, core_to_use))
 
     return local_list
 
@@ -324,7 +347,7 @@ def main():
         for indx, ip_addr in enumerate(ip_routers):
             sub = net.addDocker('sub{}'.format(indx), ip='{}/24'.format(ip_addr[111].compressed),
                                 dimage='flipperthedog/alpine_client:latest',
-                                volumes=[PWD+'/experiments:/home/ubuntu/experiments'])
+                                volumes=[PWD + '/experiments:/home/ubuntu/experiments'])
             sub_list.append(sub)
 
         # switch sub link
@@ -342,7 +365,6 @@ def main():
         # switch pub link
         for sw, pb in zip(s_list, pub_list):
             print(net.addLink(sw, pb))
-
 
     info('\n*** Starting network\n')
     net.start()
