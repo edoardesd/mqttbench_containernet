@@ -49,6 +49,8 @@ def arg_parse():
                         help='delay over a switch-container link', type=int)
     parser.add_argument('-s', '--attach-subs', dest='attach_subs', default=False,
                         action='store_true', help='include subscribers in the simulation')
+    parser.add_argument('--ram-limit', dest='ram_limit', default='2g',
+                        help='ram memory of the brokers')
 
     return parser.parse_args()
 
@@ -58,6 +60,7 @@ def start_emqx(cont_name, cont_address, bind_ip, master_node, default_route):
                          defaultRoute='via {}'.format(default_route),
                          dimage=IMAGES["EMQX"],
                          ports=[1883], port_bindings={1883: bind_ip},
+                         mem_limit=args.ram_limit,
                          environment={"EMQX_NAME": cont_name,
                                       "EMQX_HOST": cont_address[:-3],
                                       "EMQX_NODE__DIST_LISTEN_MAX": 6379,
@@ -88,6 +91,7 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route)
                       volumes=[
                           "{}:/etc/rabbitmq/rabbitmq.conf".format(dest_file),
                           PWD + "/confiles/enabled_plugins:/etc/rabbitmq/enabled_plugins"],
+                      mem_limit=args.ram_limit,
                       environment={"RABBITMQ_ERLANG_COOKIE": "GPLDKBRJYMSKLTLZQDVG"})
 
     for i in range(TOTAL_BROKERS):
@@ -98,11 +102,12 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route)
 
 
 def start_hivemq(cont_name, cont_address, bind_ip, master_node, default_route):
+    my_id = cont_address[5:-7]
     source_config_file_path = os.path.join(PWD, 'confiles/config-dns.xml')
-    dest_file = "{}/confiles/config-dns_{}.xml".format(PWD, cont_address[5:-7])
+    dest_file = "{}/confiles/config-dns_{}.xml".format(PWD, my_id)
 
     __port = 8000
-
+    print("bind_ip", bind_ip)
     config_file = ET.parse(source_config_file_path)
     cluster_nodes = config_file.getroot().find('cluster').find('discovery').find('static')
     if cluster_nodes is None:
@@ -132,8 +137,8 @@ def start_hivemq(cont_name, cont_address, bind_ip, master_node, default_route):
                              ports=[1883], port_bindings={1883: bind_ip},
                              dimage=IMAGES["HIVEMQ"],
                              volumes=[
-                                 PWD + "/confiles/config-dns_{}.xml:/opt/hivemq/conf/config.xml".format(
-                                     cont_address[5:-7])],
+                                 PWD + "/confiles/config-dns_{}.xml:/opt/hivemq/conf/config.xml".format(my_id)],
+                             mem_limit=args.ram_limit,
                              environment={
                                  "HIVEMQ_BIND_ADDRESS": cont_address[:-3]
                              })
@@ -144,6 +149,7 @@ def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route):
                          defaultRoute='via {}'.format(default_route),
                          dimage=IMAGES["VERNEMQ"],
                          ports=[1883], port_bindings={1883: bind_ip},
+                         mem_limit=args.ram_limit,
                          environment={
                              "DOCKER_VERNEMQ_NODENAME": cont_address[:-3],
                              "DOCKER_VERNEMQ_DISCOVERY_NODE": master_node[master_node.index("@") + 1:-3],
@@ -318,8 +324,7 @@ def main():
         for indx, ip_addr in enumerate(ip_routers):
             sub = net.addDocker('sub{}'.format(indx), ip='{}/24'.format(ip_addr[111].compressed),
                                 dimage='flipperthedog/alpine_client:latest',
-                                volumes=[PWD+'/experiments'
-                                         ':/home/ubuntu/experiments'])
+                                volumes=[PWD+'/experiments:/home/ubuntu/experiments'])
             sub_list.append(sub)
 
         # switch sub link
@@ -330,7 +335,8 @@ def main():
         pub_list = []
         for indx, ip_addr in enumerate(ip_routers):
             pub = net.addDocker('pub{}'.format(indx), ip='{}/24'.format(ip_addr[112].compressed),
-                                dimage='flipperthedog/go_publisher:bash')
+                                dimage='flipperthedog/go_publisher:latest',
+                                volumes=[PWD + '/experiments:/go/src/app/experiments'])
             pub_list.append(pub)
 
         # switch pub link
