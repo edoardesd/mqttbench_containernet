@@ -26,6 +26,8 @@ def arg_parse():
                         help='number of messages per client', type=int)
     parser.add_argument('-c', '--clients-num', dest='clients_num', default=10,
                         help='number of different clients', type=int)
+    parser.add_argument('-n', '--name', dest='sim_name', default='test',
+                        help='name of the simulation folder')
     # parser.print_help()
 
     return parser.parse_args()
@@ -106,8 +108,6 @@ def main():
         x.start()
 
     time.sleep(.5)
-    print(" ")
-    print("Wait", end='', flush=True)
 
     for x in clients:
         x.join()
@@ -120,10 +120,9 @@ def main():
 if __name__ == "__main__":
     print("SUB CLIENT THREADED VERSION")
     args = arg_parse()
-    broker_num = "b" + args.host.split('.')[2] + "_"
+    broker_num = "_b" + args.host.split('.')[2] + "_"
     file_name = broker_num + datetime.now().strftime("%H%M%S") + ".txt"
-    print(file_name)
-    nested_folder = FOLDER + datetime.now().strftime("%m%d")
+    nested_folder = FOLDER + datetime.now().strftime("%m%d") + "/" + args.sim_name
     Path(nested_folder).mkdir(parents=True, exist_ok=True)
 
     main()
