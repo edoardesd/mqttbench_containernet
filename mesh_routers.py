@@ -50,8 +50,8 @@ def arg_parse():
                         help='delay over a router link', type=int)
     parser.add_argument('-c', '--delay-switch', dest='container_delay', default=DELAY,
                         help='delay over a switch-container link', type=int)
-    parser.add_argument('-s', '--attach-subs', dest='attach_subs', default=False,
-                        action='store_true', help='include subscribers in the simulation')
+    parser.add_argument('-s', '--disable-client', dest='no_clients', default=False,
+                        action='store_true', help='exclude clients in the simulation')
     parser.add_argument('--ram-limit', dest='ram_limit', default='2g',
                         help='ram memory of the brokers')
     parser.add_argument('--cpu', dest='cpu', default=False, action='store_true',
@@ -341,7 +341,7 @@ def main():
     # middle_switch = [net.addSwitch('middle{}'.format(s)) for s in range(TOTAL_BROKERS)]
 
     # #creating subs
-    if args.attach_subs:
+    if not args.no_clients:
         info('\n*** Adding subscribers\n')
         sub_list = []
         for indx, ip_addr in enumerate(ip_routers):
@@ -371,7 +371,7 @@ def main():
     # net.staticArp()
 
     info('\n*** Testing connectivity\n')
-    if not args.attach_subs:
+    if args.no_clients:
         net.pingAll()
     else:
         for sb, cnt in zip(sub_list, container_list):
