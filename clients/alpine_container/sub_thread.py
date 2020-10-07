@@ -8,8 +8,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-FOLDER = "experiments/"
-
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
@@ -26,8 +24,10 @@ def arg_parse():
                         help='number of messages per client', type=int)
     parser.add_argument('-c', '--clients-num', dest='clients_num', default=10,
                         help='number of different clients', type=int)
-    parser.add_argument('-n', '--name', dest='sim_name', default='test',
+    parser.add_argument('-f', '--folder', dest='folder', default='experiments/untracked',
                         help='name of the simulation folder')
+    parser.add_argument('-n', '--file-name', dest='file_name', default=datetime.now().strftime("%H%M%S"),
+                        help='name of the file')
     # parser.print_help()
 
     return parser.parse_args()
@@ -47,11 +47,11 @@ class Receiver(threading.Thread):
         self.e2e_result.append(
             "{}, {}, {}, {}".format(args.host, client._client_id, str(message.payload.decode("utf-8")),
                                     current_milli_time(),
-                                    message.qos))
+                                    args.qos))
         # self.e2e_dict[self.counter] = "{}, {}, {}, {}".format(args.host, client._client_id,
         #                                                       str(message.payload.decode("utf-8")),
         #                                                       datetime.now().strftime("%H:%M:%S.%f")[:-3],
-        #                                                       message.qos)
+        #                                                       args.qos)
 
         self.counter += 1
         if self.counter % 10 == 0:
@@ -82,11 +82,11 @@ class Receiver(threading.Thread):
             pass
 
         print("{} received {} messages".format(self.name, len(self.e2e_result)))
-        with open(nested_folder + "/e2e" + file_name, "a") as f:
+        with open(args.folder + "/e2e" + file_name, "a") as f:
             f.write("\n".join(self.e2e_result))
             f.write("\n")
 
-        with open(nested_folder + "/conn" + file_name, "a") as f:
+        with open(args.folder + "/conn" + file_name, "a") as f:
             f.write("\n".join(self.connect_result))
             f.write("\n")
 
@@ -98,10 +98,10 @@ def main():
         t_mqtt.setDaemon(True)
         clients.append(t_mqtt)
 
-    with open(nested_folder + "/e2e" + file_name, "a") as f:
+    with open(args.folder + "/e2e" + file_name, "a") as f:
         f.write("broker, client, sent, received, qos\n")
 
-    with open(nested_folder + "/conn" + file_name, "a") as f:
+    with open(args.folder + "/conn" + file_name, "a") as f:
         f.write("broker, client, conn, connack\n")
 
     for x in clients:
@@ -112,7 +112,7 @@ def main():
     for x in clients:
         x.join()
 
-    print("SUB DONE")
+    print("SUBSCRIBER {} is done receiving".format(broker_num[2]))
     time.sleep(1)
     sys.exit(1)
 
@@ -121,8 +121,7 @@ if __name__ == "__main__":
     print("SUB CLIENT THREADED VERSION")
     args = arg_parse()
     broker_num = "_b" + args.host.split('.')[2] + "_"
-    file_name = broker_num + datetime.now().strftime("%H%M%S") + ".txt"
-    nested_folder = FOLDER + datetime.now().strftime("%m%d") + "/" + args.sim_name
-    Path(nested_folder).mkdir(parents=True, exist_ok=True)
+    file_name = broker_num + args.file_name + ".txt"
+    Path(args.folder).mkdir(parents=True, exist_ok=True)
 
     main()
