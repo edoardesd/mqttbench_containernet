@@ -54,7 +54,7 @@ Available in [this](https://github.com/edoardesd/mqttbench_containernet/tree/mas
 The container image is on [DockerHub](https://hub.docker.com/repository/docker/flipperthedog/alpine_client).
 
 - Syntax: as the publisher
-- Example: `python3 clients/alpine_container/sub_thread.py -h 10.0.0.100 -t topic -q "$QOS" -m 10 -c 10 --folder experiments/today --file-name sim`
+- Example: `python3 clients/alpine_container/sub_thread.py -h 10.0.0.100 -t topic -q 2 -m 10 -c 10 --folder experiments/today --file-name sim`
 
 - Modify and push: 
     + go to `mqttbench_containernet/clients/alpine_container`
