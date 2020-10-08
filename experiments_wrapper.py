@@ -13,6 +13,7 @@ num_messages = data['num_messages']
 msg_wait = data['msg_wait']
 qos = data["qos"]
 topic = data["topic"].split(",")
+MY_DIR = os.path.expanduser("~/mqttbench_containernet")
 
 
 def print_sim(index):
@@ -44,11 +45,12 @@ for i in range(0, len(publishers)):
     sub_folder = "{}pub-{}sub".format(publishers[i], subscribers[i])
     folder = "{}/{}".format(start_sim, sub_folder)
 
-    command = "/home/samsepiol/mqttbench_containernet/start_clients.sh --clients {} --delay {} --messages {} --qos {} --name {}".format(publishers[i],
-                                                                                     msg_wait[i],
-                                                                                     num_messages[i],
-                                                                                     qos[i],
-                                                                                     folder)
+    command = "{}/start_clients.sh --clients {} --delay {} --messages {} --qos {} --name {}".format(MY_DIR,
+                                                                                                    publishers[i],
+                                                                                                    msg_wait[i],
+                                                                                                    num_messages[i],
+                                                                                                    qos[i],
+                                                                                                    folder)
     os.system(command)
 
     print("")
