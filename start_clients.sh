@@ -45,7 +45,7 @@ do
 done
 
 SUB_MESSAGES=$((PUB_MESSAGES*5))
-FULL_FOLDER="experiments/$DATE/$NAME"
+FULL_FOLDER=$NAME
 
 echo "MAIN FOLDER  : $FULL_FOLDER"
 echo "FILE NAME    : $NAME"

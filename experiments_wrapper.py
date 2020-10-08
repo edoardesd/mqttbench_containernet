@@ -39,11 +39,12 @@ print("="*20)
 print("")
 print("")
 
-start_sim = datetime.now().strftime("%H%M%S")
+day_sim = datetime.now().strftime("%m-%d")
+time_sim = datetime.now().strftime("%H%M%S")
 for i in range(0, len(publishers)):
     print_sim(i)
     sub_folder = "{}pub-{}sub".format(publishers[i], subscribers[i])
-    folder = "{}/{}".format(start_sim, sub_folder)
+    folder = "{}/experiments/{}/{}/{}".format(MY_DIR, day_sim, time_sim, sub_folder)
 
     command = "{}/start_clients.sh --clients {} --delay {} --messages {} --qos {} --name {}".format(MY_DIR,
                                                                                                     publishers[i],
