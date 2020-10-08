@@ -28,7 +28,8 @@
     - `--delay <number>`: delay between publishes
     - `--messages <number>`: number of published messages
     - `--qos <0,1,2>`: MQTT Quality of Service for pubs and subs
-    - Example: `./start_clients.sh --clients 5 --delay 2 --messages 50 --qos 2`
+    - `--name <path_file>`: path of the storage file
+    - Example: `./start_clients.sh --clients 5 --delay 2 --messages 50 --qos 2 --name <path>`
     
 ### Clients
 #### Publisher:
