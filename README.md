@@ -39,7 +39,7 @@ The container image is on [DockerHub](https://hub.docker.com/repository/docker/f
 The scripts spawn `n` clients that publish `m` message every `d` seconds and store the flight time in a `filename` file.
 
 - Syntax: `./mqtt-benchmark --broker tcp://<broker_addr>:<port> --topic <name> --clients <num_clients> --count <msg_clients> --qos <0,1,2> --delay <seconds> --folder <path/to/folder> --file-name <output_filename>`
-- Example: `docker exec -t mn.pub1 mqtt-benchmark --broker tcp://10.0.1.100:1883 --topic test --clients 10" --count 10 --qos 2 --delay 1 --folder "experiments/today" --file-name "sim"`
+- Example: `docker exec -t mn.pub1 mqtt-benchmark --broker tcp://10.0.1.100:1883 --topic test --clients 10 --count 10 --qos 2 --delay 1 --folder experiments/today --file-name sim`
 
 - Modify and push: 
     + go to `goprojects/src/github.com/mqtt-benchmark/`
@@ -54,7 +54,7 @@ Available in [this](https://github.com/edoardesd/mqttbench_containernet/tree/mas
 The container image is on [DockerHub](https://hub.docker.com/repository/docker/flipperthedog/alpine_client).
 
 - Syntax: as the publisher
-- Example: `python3 clients/alpine_container/sub_thread.py -h 10.0.0.100 -t topic -q "$QOS" -m 10 -c 10 --folder "experiments/today" --file-name "sim"`
+- Example: `python3 clients/alpine_container/sub_thread.py -h 10.0.0.100 -t topic -q "$QOS" -m 10 -c 10 --folder experiments/today --file-name sim`
 
 - Modify and push: 
     + go to `mqttbench_containernet/clients/alpine_container`
