@@ -6,6 +6,7 @@ SUB_MESSAGES=unset
 CLIENTS=unset
 QOS=unset
 DELAY=unset
+NAME=unset
 TOPIC="test"
 DATE=$(date +"%m-%d")
 FILE_NAME=$(date +"%H%M%S")
@@ -15,17 +16,18 @@ usage()
   echo "Usage:  start_clients [ -c | --clients CLIENTS ]
                 [ -d | --delay   DELAY   ]
                 [ -m | --messages PUB_MESSAGES ]
+                [ -n | --name NAME]
                 [ -q | --qos QOS]"
   exit 2
 }
 
-PARSED_ARGUMENTS=$(getopt -a -n start_clients -o c:d:m:q: --long clients:,delay:,messages:,qos: -- "$@")
+PARSED_ARGUMENTS=$(getopt -a -n start_clients -o c:d:m:n:q: --long clients:,delay:,messages:,name:,qos: -- "$@")
 VALID_ARGUMENTS=$?
 if [ "$VALID_ARGUMENTS" != "0" ]; then
   usage
 fi
 
-echo "PARSED_ARGUMENTS is $PARSED_ARGUMENTS"
+echo "PARSED_ARGUMENTS are $PARSED_ARGUMENTS"
 eval set -- "$PARSED_ARGUMENTS"
 while :
 do
@@ -33,6 +35,7 @@ do
     -c | --clients)  CLIENTS="$2"      ; shift 2 ;;
     -d | --delay)    DELAY="$2"        ; shift 2 ;;
     -m | --messages) PUB_MESSAGES="$2" ; shift 2 ;;
+    -n | --name)     NAME="$2" ; shift 2 ;;
     -q | --qos)      QOS="$2"          ; shift 2 ;;
     --) shift; break ;;
 
@@ -42,10 +45,10 @@ do
 done
 
 SUB_MESSAGES=$((PUB_MESSAGES*5))
-FULL_FOLDER="experiments/$DATE/$FILE_NAME"
+FULL_FOLDER="experiments/$DATE/$NAME"
 
 echo "MAIN FOLDER  : $FULL_FOLDER"
-echo "FILE NAME    : $FILE_NAME"
+echo "FILE NAME    : $NAME"
 
 echo "CLIENTS      : $CLIENTS"
 echo "DELAY        : $DELAY "
@@ -89,9 +92,11 @@ docker exec -t mn.pub4 mqtt-benchmark --broker tcp://10.0.4.100:1883 --topic "$T
 BACK_PID=$!
 
 wait $BACK_PID
+SLEEP_TIME=$((PUB_MESSAGES*5/2))
 
-sleep 20
-echo "Done!"
+sleep $SLEEP_TIME
 
 kill -9 $FILE_PID
 killall -9 tcpdump
+
+exit 1
