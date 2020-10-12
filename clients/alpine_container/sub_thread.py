@@ -118,10 +118,12 @@ def main():
 
 
 if __name__ == "__main__":
-    print("SUB CLIENT THREADED VERSION")
+    print("SUB CLIENT THREADED VERSIONe")
     args = arg_parse()
     broker_num = "_b" + args.host.split('.')[2] + "_"
     file_name = broker_num + args.file_name + ".txt"
+    print(">>> folder by sub: ", args.folder)
+    print(">>>> file name: ", file_name)
     Path(args.folder).mkdir(parents=True, exist_ok=True)
 
     main()
