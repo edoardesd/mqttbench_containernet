@@ -1,0 +1,8 @@
+{
+  "publishers" : [1],
+  "subscribers" : [1],
+  "num_messages": [10],
+  "msg_wait": [1],
+  "qos": [2],
+  "topic": "test"
+}
