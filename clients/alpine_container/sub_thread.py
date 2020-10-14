@@ -45,7 +45,7 @@ class Receiver(threading.Thread):
 
     def on_message(self, client, userdata, message):
         self.e2e_result.append(
-            "{}, {}, {}, {}".format(args.host, client._client_id, str(message.payload.decode("utf-8")),
+            "{},{},{},{}, {}".format(args.host, client._client_id, str(message.payload.decode("utf-8")),
                                     current_milli_time(),
                                     args.qos))
         # self.e2e_dict[self.counter] = "{}, {}, {}, {}".format(args.host, client._client_id,
@@ -63,7 +63,7 @@ class Receiver(threading.Thread):
     def on_connect(self, client, userdata, flags, rc):
         print("Client {} connected to {}".format(client._client_id, args.host))
 
-        self.connect_result.append("{}, {}, {}, {}".format(args.host, client._client_id, self.connect_start,
+        self.connect_result.append("{},{},{},{}".format(args.host, client._client_id, self.connect_start,
                                                            current_milli_time()))
 
         client.subscribe(args.topic, args.qos)
@@ -99,10 +99,10 @@ def main():
         clients.append(t_mqtt)
 
     with open(args.folder + "/e2e" + file_name, "a") as f:
-        f.write("broker, client, sent, received, qos\n")
+        f.write("thisbroker,client_name,client_broker,client_id,sent,received,qos\n")
 
     with open(args.folder + "/conn" + file_name, "a") as f:
-        f.write("broker, client, conn, connack\n")
+        f.write("broker,client,conn,connack\n")
 
     for x in clients:
         x.start()

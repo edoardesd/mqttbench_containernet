@@ -9,7 +9,7 @@ DELAY=unset
 NAME=unset
 TOPIC="test"
 DATE=$(date +"%m-%d")
-FILE_NAME=$(date +"%H%M%S")
+FILE_NAME="_"
 
 usage()
 {
@@ -45,6 +45,7 @@ do
 done
 
 SUB_MESSAGES=$((PUB_MESSAGES*5))
+BREAK=$((DELAY*100))
 FULL_FOLDER=$NAME
 
 echo "MAIN FOLDER  : $FULL_FOLDER"
@@ -84,11 +85,11 @@ docker exec -t mn.sub4 python sub_thread.py -h 10.0.4.100 -t "$TOPIC" -q "$QOS" 
 sleep 10
 
 echo "Starting pubs"
-docker exec -t mn.pub0 mqtt-benchmark --broker tcp://10.0.0.100:1883 --topic "$TOPIC" --clients "$CLIENTS" --count "$PUB_MESSAGES" --qos "$QOS" --delay "$DELAY" --folder "$FULL_FOLDER" --file-name "$FILE_NAME" &
-docker exec -t mn.pub1 mqtt-benchmark --broker tcp://10.0.1.100:1883 --topic "$TOPIC" --clients "$CLIENTS" --count "$PUB_MESSAGES" --qos "$QOS" --delay "$DELAY" --folder "$FULL_FOLDER" --file-name "$FILE_NAME" &
-docker exec -t mn.pub2 mqtt-benchmark --broker tcp://10.0.2.100:1883 --topic "$TOPIC" --clients "$CLIENTS" --count "$PUB_MESSAGES" --qos "$QOS" --delay "$DELAY" --folder "$FULL_FOLDER" --file-name "$FILE_NAME" &
-docker exec -t mn.pub3 mqtt-benchmark --broker tcp://10.0.3.100:1883 --topic "$TOPIC" --clients "$CLIENTS" --count "$PUB_MESSAGES" --qos "$QOS" --delay "$DELAY" --folder "$FULL_FOLDER" --file-name "$FILE_NAME" &
-docker exec -t mn.pub4 mqtt-benchmark --broker tcp://10.0.4.100:1883 --topic "$TOPIC" --clients "$CLIENTS" --count "$PUB_MESSAGES" --qos "$QOS" --delay "$DELAY" --folder "$FULL_FOLDER" --file-name "$FILE_NAME" &
+docker exec -t mn.pub0 mqtt-benchmark --broker tcp://10.0.0.100:1883 --topic "$TOPIC" --clients "$CLIENTS" --count "$PUB_MESSAGES" --qos "$QOS" --delay "$DELAY" --block "$BREAK" --folder "$FULL_FOLDER" --file-name "$FILE_NAME" &
+docker exec -t mn.pub1 mqtt-benchmark --broker tcp://10.0.1.100:1883 --topic "$TOPIC" --clients "$CLIENTS" --count "$PUB_MESSAGES" --qos "$QOS" --delay "$DELAY" --block "$BREAK" --folder "$FULL_FOLDER" --file-name "$FILE_NAME" &
+docker exec -t mn.pub2 mqtt-benchmark --broker tcp://10.0.2.100:1883 --topic "$TOPIC" --clients "$CLIENTS" --count "$PUB_MESSAGES" --qos "$QOS" --delay "$DELAY" --block "$BREAK" --folder "$FULL_FOLDER" --file-name "$FILE_NAME" &
+docker exec -t mn.pub3 mqtt-benchmark --broker tcp://10.0.3.100:1883 --topic "$TOPIC" --clients "$CLIENTS" --count "$PUB_MESSAGES" --qos "$QOS" --delay "$DELAY" --block "$BREAK" --folder "$FULL_FOLDER" --file-name "$FILE_NAME" &
+docker exec -t mn.pub4 mqtt-benchmark --broker tcp://10.0.4.100:1883 --topic "$TOPIC" --clients "$CLIENTS" --count "$PUB_MESSAGES" --qos "$QOS" --delay "$DELAY" --block "$BREAK" --folder "$FULL_FOLDER" --file-name "$FILE_NAME" &
 BACK_PID=$!
 
 wait $BACK_PID
