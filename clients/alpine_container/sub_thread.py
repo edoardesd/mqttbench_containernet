@@ -5,7 +5,7 @@ import string
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -42,8 +42,10 @@ class Receiver(threading.Thread):
         self.connect_start = 0
         self.connect_result = []
         self.e2e_dict = {}
+        self.last_msg = None
 
     def on_message(self, client, userdata, message):
+        self.last_msg = datetime.now()
         self.e2e_result.append(
             "{},{},{},{}, {}".format(args.host, client._client_id, str(message.payload.decode("utf-8")),
                                     current_milli_time(),
@@ -59,6 +61,7 @@ class Receiver(threading.Thread):
 
         if self.counter >= args.msg_num * args.clients_num:
             self.is_running = False
+
 
     def on_connect(self, client, userdata, flags, rc):
         print("Client {} connected to {}".format(client._client_id, args.host))
@@ -79,6 +82,10 @@ class Receiver(threading.Thread):
         client.loop_start()
 
         while self.is_running:
+            print(datetime.now(), self.last_msg)
+            if self.last_msg is not None:
+                if datetime.now() - self.last_msg > timedelta(minutes=2):
+                    self.is_running = False
             pass
 
         print("{} received {} messages".format(self.name, len(self.e2e_result)))
