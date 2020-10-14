@@ -55,7 +55,7 @@ def main():
         print("")
         print("")
         print("Simulation {} finished".format(i + 1))
-        time.sleep(10)
+        time.sleep(publishers[i]*20)
 
 
 if __name__ == "__main__":
