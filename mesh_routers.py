@@ -50,6 +50,8 @@ def arg_parse():
                         help='delay over a router link', type=int)
     parser.add_argument('-c', '--delay-switch', dest='container_delay', default=DELAY,
                         help='delay over a switch-container link', type=int)
+    parser.add_argument('-b', '--brokers', dest='num_broker', default=TOTAL_BROKERS,
+                        help='cluster size', type=int)
     parser.add_argument('-s', '--disable-client', dest='no_clients', default=False,
                         action='store_true', help='exclude clients in the simulation')
     parser.add_argument('--ram-limit', dest='ram_limit', default='2g',
@@ -406,5 +408,5 @@ if __name__ == "__main__":
     net = Containernet(controller=Controller)
 
     args = arg_parse()
-
+    TOTAL_BROKERS = args.num_broker
     main()
