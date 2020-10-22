@@ -47,7 +47,7 @@ class Receiver(threading.Thread):
     def on_message(self, client, userdata, message):
         self.last_msg = datetime.now()
         self.e2e_result.append(
-            "{},{},{},{}, {}".format(args.host, client._client_id, str(message.payload.decode("utf-8")),
+            "{},{},{},{},{}".format(args.host, client._client_id, str(message.payload.decode("utf-8")),
                                     current_milli_time(),
                                     args.qos))
         # self.e2e_dict[self.counter] = "{}, {}, {}, {}".format(args.host, client._client_id,
@@ -59,7 +59,7 @@ class Receiver(threading.Thread):
         if self.counter % 10 == 0:
             print(".", end='', flush=True)
 
-        if self.counter >= args.msg_num * args.clients_num:
+        if self.counter >= args.msg_num:
             self.is_running = False
 
 
@@ -82,10 +82,10 @@ class Receiver(threading.Thread):
         client.loop_start()
 
         while self.is_running:
-            print(datetime.now(), self.last_msg)
             if self.last_msg is not None:
                 if datetime.now() - self.last_msg > timedelta(minutes=2):
                     self.is_running = False
+                    print("waited too much")
             pass
 
         print("{} received {} messages".format(self.name, len(self.e2e_result)))
@@ -97,6 +97,9 @@ class Receiver(threading.Thread):
             f.write("\n".join(self.connect_result))
             f.write("\n")
 
+        client.disconnect()
+        print("Client {} disconnected".format(self.name))
+
 
 def main():
     clients = []
@@ -106,7 +109,7 @@ def main():
         clients.append(t_mqtt)
 
     with open(args.folder + "/e2e" + file_name, "a") as f:
-        f.write("thisbroker,client_name,client_broker,client_id,sent,received,qos\n")
+        f.write("receiver_id,src_brk,client_num,sent,msg_id,received,qos\n")
 
     with open(args.folder + "/conn" + file_name, "a") as f:
         f.write("broker,client,conn,connack\n")
