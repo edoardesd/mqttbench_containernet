@@ -31,8 +31,8 @@ locality_dict = {
         'pub': random.randint(0, CLUSTER_SIZE - 1),
         'sub': None}
 }
-locality_dict[0]['sub'] = [random.choice([i for i in range(0, CLUSTER_SIZE) if i not in [locality_dict[0]['pub']]])]
-locality_dict[100]['sub'] = [locality_dict[100]['pub']]
+locality_dict[0]['sub'] = [random.choice([i for i in range(0, CLUSTER_SIZE) if i not in [locality_dict[0]['pub']]])] * CLUSTER_SIZE
+locality_dict[100]['sub'] = [locality_dict[100]['pub']] * CLUSTER_SIZE
 
 def arg_parse():
     parser = argparse.ArgumentParser(description='Locality experiment', add_help=False)
