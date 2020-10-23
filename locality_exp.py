@@ -78,8 +78,8 @@ def start_tcpdump(_path):
 
 def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
     random.shuffle(_subscribers)
-    print(_subscribers)
-    for sub in _subscribers:
+    for indx, sub in enumerate(_subscribers):
+        print(_file_name + str(indx))
         subscriber_cmd = "docker exec -t mn.sub{id} python sub_thread.py -h 10.0.{id}.100 " \
                          "-t {topic} -q {qos} -m {msg} -c {clients} --folder {folder} --file-name {name} &".format(
                           id=sub,
@@ -88,7 +88,7 @@ def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
             msg=NUM_MESSAGES,
             clients=math.floor(NUM_SUBSCRIBERS / len(_subscribers)),
             folder=_path,
-            name=_file_name)
+            name="{}_{}".format(_file_name,indx))
 
         os.system(subscriber_cmd)
         print("Subscriber {id} created".format(id=sub))
