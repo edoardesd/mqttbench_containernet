@@ -109,7 +109,7 @@ def main():
         clients.append(t_mqtt)
 
     with open(args.folder + "/e2e" + file_name, "a") as f:
-        f.write("receiver_id,src_brk,client_num,sent,msg_id,received,qos\n")
+        f.write("receiver_brk,receiver_id,src_brk,client_num,sent,msg_id,received,qos\n")
 
     with open(args.folder + "/conn" + file_name, "a") as f:
         f.write("broker,client,conn,connack\n")
