@@ -1,3 +1,4 @@
 #untrack folders
 experiments/
 clients/old
+confiles/rabbitmq*.conf
