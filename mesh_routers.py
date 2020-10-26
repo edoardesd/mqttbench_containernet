@@ -79,7 +79,7 @@ def start_emqx(cont_name, cont_address, bind_ip, master_node, default_route, cpu
 
 
 def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
-    dest_file = "{}/confiles/rabbitmq_{}.conf".format(PWD, cont_address[5:-7])
+    dest_file = "{}/confiles/rabbitmq{}.conf".format(PWD, cont_address[5:-7])
     copyfile(PWD + "/confiles/rabbitmq.conf", dest_file)
     with open(dest_file, "a") as f:
         c = 0
@@ -87,8 +87,8 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route,
             _ip = "{}{}.100/24".format(IP_ADDR, i)
             if _ip != cont_address:
                 c += 1
-                print("cluster_formation.classic_config.nodes.{} = rabbit@rabbitmq_{}\n".format(c, i))
-                f.write("cluster_formation.classic_config.nodes.{} = rabbit@rabbitmq_{}\n".format(c, i))
+                # print("cluster_formation.classic_config.nodes.{} = rabbit@rabbitmq{}\n".format(c, i))
+                f.write("cluster_formation.classic_config.nodes.{} = rabbit@rabbitmq{}\n".format(c, i))
 
     d = net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
                       defaultRoute='via {}'.format(default_route),
@@ -104,7 +104,7 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route,
 
     for i in range(TOTAL_BROKERS):
         _ip = "{}{}.100".format(IP_ADDR, i)
-        d.cmd('echo "{}      {}" >> /etc/hosts'.format(_ip, "rabbitmq_" + str(i)))
+        d.cmd('echo "{}      {}" >> /etc/hosts'.format(_ip, "rabbitmq" + str(i)))
 
     return d
 
