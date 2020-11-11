@@ -20,6 +20,7 @@ PWD = os.getcwd()
 VERSION = 1
 TOTAL_BROKERS = 5
 DELAY = 10
+BRIDGE_QOS = 2
 IP_ADDR = '10.0.'
 CPU_VBOX = 6
 CPU_ANTLAB = 12
@@ -27,7 +28,11 @@ IMAGES = {
     "EMQX": "flipperthedog/emqx-ip:latest",
     "VERNEMQ": "francigjeci/vernemq-debian:latest",
     "RABBITMQ": "flipperthedog/rabbitmq:ping",
-    "HIVEMQ": "francigjeci/hivemq:dns-image"
+    "HIVEMQ": "francigjeci/hivemq:dns-image",
+    "MOSQUITTO": "flipperthedog/mosquitto:latest",
+    "SUBSCRIBER": "flipperthedog/alpine_client:latest",
+    "PUBLiSHER": "flipperthedog/go_publisher:latest"
+
 }
 
 
@@ -45,7 +50,7 @@ class LinuxRouter(Node):
 def arg_parse():
     parser = argparse.ArgumentParser(description='MQTT cluster simulation')
     parser.add_argument('-t', '--type', dest='cluster_type', default='emqx',
-                        help='broker type (EMQX, RABBITMQ, VERNEMQ, HIVEMQ)')
+                        help='broker type (EMQX, RABBITMQ, VERNEMQ, HIVEMQ, MOSQUITTO)')
     parser.add_argument('-d', '--delay-routers', dest='router_delay', default=DELAY,
                         help='delay over a router link', type=int)
     parser.add_argument('-c', '--delay-switch', dest='container_delay', default=DELAY,
@@ -100,6 +105,7 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route,
                           "{}:/etc/rabbitmq/rabbitmq.conf".format(dest_file),
                           PWD + "/confiles/enabled_plugins:/etc/rabbitmq/enabled_plugins"],
                       mem_limit=args.ram_limit,
+                      cpuset_cpus=cpu,
                       environment={"RABBITMQ_ERLANG_COOKIE": "GPLDKBRJYMSKLTLZQDVG"})
 
     for i in range(TOTAL_BROKERS):
@@ -147,6 +153,7 @@ def start_hivemq(cont_name, cont_address, bind_ip, master_node, default_route, c
                              volumes=[
                                  PWD + "/confiles/config-dns_{}.xml:/opt/hivemq/conf/config.xml".format(my_id)],
                              mem_limit=args.ram_limit,
+                             cpuset_cpus=cpu,
                              environment={
                                  "HIVEMQ_BIND_ADDRESS": cont_address[:-3]
                              })
@@ -158,6 +165,7 @@ def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route, 
                          dimage=IMAGES["VERNEMQ"],
                          ports=[1883], port_bindings={1883: bind_ip},
                          mem_limit=args.ram_limit,
+                         cpuset_cpus=cpu,
                          environment={
                              "DOCKER_VERNEMQ_NODENAME": cont_address[:-3],
                              "DOCKER_VERNEMQ_DISCOVERY_NODE": master_node[master_node.index("@") + 1:-3],
@@ -165,6 +173,36 @@ def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route, 
                              "DOCKER_VERNEMQ_ALLOW_ANONYMOUS": "on",
                              "DOCKER_VERNEMQ_LISTENER.tcp.containernet": cont_address[:-3] + ":1883"
                          })
+
+
+def start_mosquitto(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
+    dest_file = "{}/confiles/mosquitto{}.conf".format(PWD, cont_address[5:-7])
+
+    with open(dest_file, "w") as f:
+        f.write("persistence true\npersistence_location /mosquitto/data/\n")
+        f.write("log_dest file /mosquitto/log/mosquitto.log\n")
+        f.write("log_dest stdout\nlog_type all")
+
+    if cont_name in master_node:
+        print("master master")
+        for i in range(TOTAL_BROKERS):
+            _ip = "{}{}.100/24".format(IP_ADDR, i)
+            if _ip != cont_address:
+                with open(dest_file, "a") as f:
+                    f.write("\nconnection id_{}\n".format(i))
+                    f.write("address {}:{}\n".format(_ip[:-3], 1883))
+                    f.write("topic # both {}\n".format(BRIDGE_QOS))
+                    f.write("remote_clientid id_{}\n\n".format(i))
+                    f.write("keepalive_interval 5")
+
+    return net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
+                         defaultRoute='via {}'.format(default_route),
+                         dimage=IMAGES["MOSQUITTO"],
+                         volumes=["{}:/mosquitto/config/mosquitto.conf".format(dest_file)],
+                         ports=[1883], port_bindings={1883: bind_ip},
+                         mem_limit=args.ram_limit,
+                         cpuset_cpus=cpu
+                         )
 
 
 def invalid(broker):
@@ -175,7 +213,6 @@ def assign_cpu(core_num, core_list):
     core_per_broker = math.floor(core_num/TOTAL_BROKERS)
 
     this_cpu = []
-    print(core_list, core_per_broker)
     for i in range(core_per_broker):
         this_cpu.append(core_list.pop(0))
 
@@ -187,7 +224,8 @@ def create_containers(argument, router_ips):
         'EMQX': start_emqx,
         'RABBITMQ': start_rabbitmq,
         'VERNEMQ': start_vernemq,
-        'HIVEMQ': start_hivemq
+        'HIVEMQ': start_hivemq,
+        'MOSQUITTO': start_mosquitto
     }
     func = switcher.get(argument, lambda: invalid())
 
@@ -348,7 +386,7 @@ def main():
         sub_list = []
         for indx, ip_addr in enumerate(ip_routers):
             sub = net.addDocker('sub{}'.format(indx), ip='{}/24'.format(ip_addr[111].compressed),
-                                dimage='flipperthedog/alpine_client:latest',
+                                dimage=IMAGES["SUBSCRIBER"],
                                 volumes=[PWD + '/experiments:/home/ubuntu/experiments'])
             sub_list.append(sub)
 
@@ -360,7 +398,7 @@ def main():
         pub_list = []
         for indx, ip_addr in enumerate(ip_routers):
             pub = net.addDocker('pub{}'.format(indx), ip='{}/24'.format(ip_addr[112].compressed),
-                                dimage='flipperthedog/go_publisher:latest',
+                                dimage=IMAGES["PUBLiSHER"],
                                 volumes=[PWD + '/experiments:/go/src/app/experiments'])
             pub_list.append(pub)
 
