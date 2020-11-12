@@ -2,3 +2,4 @@
 experiments/
 clients/old
 confiles/rabbitmq*.conf
+confiles/mosquitto*.conf

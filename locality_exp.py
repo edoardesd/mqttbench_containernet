@@ -11,8 +11,9 @@ import pprint as pp
 from datetime import datetime
 from pathlib import Path
 
-NUM_SUBSCRIBERS = 15
-NUM_PUBLISHERS = math.floor(NUM_SUBSCRIBERS / 10)
+NUM_SUBSCRIBERS = 150
+NUM_PUBLISHERS = math.floor(NUM_SUBSCRIBERS / 100)
+NUMBER_SIMULATIONS = 5
 qos_list = [0, 1, 2]
 topic_name = "topic"
 message_delay = 1
@@ -31,8 +32,10 @@ locality_dict = {
         'pub': random.randint(0, CLUSTER_SIZE - 1),
         'sub': None}
 }
-locality_dict[0]['sub'] = [random.choice([i for i in range(0, CLUSTER_SIZE) if i not in [locality_dict[0]['pub']]])] * CLUSTER_SIZE
+locality_dict[0]['sub'] = [random.choice(
+    [i for i in range(0, CLUSTER_SIZE) if i not in [locality_dict[0]['pub']]])] * CLUSTER_SIZE
 locality_dict[100]['sub'] = [locality_dict[100]['pub']] * CLUSTER_SIZE
+
 
 def arg_parse():
     parser = argparse.ArgumentParser(description='Locality experiment', add_help=False)
@@ -42,6 +45,7 @@ def arg_parse():
                         help='Cluster type')
 
     return parser.parse_args()
+
 
 def print_details():
     print()
@@ -82,13 +86,13 @@ def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
         print(_file_name + str(indx))
         subscriber_cmd = "docker exec -t mn.sub{id} python sub_thread.py -h 10.0.{id}.100 " \
                          "-t {topic} -q {qos} -m {msg} -c {clients} --folder {folder} --file-name {name} &".format(
-                          id=sub,
-                          topic=topic_name,
-                          qos=_qos,
-            msg=NUM_MESSAGES,
-            clients=math.floor(NUM_SUBSCRIBERS / len(_subscribers)),
-            folder=_path,
-            name="{}_{}".format(_file_name,indx))
+                                                        id=sub,
+                                                        topic=topic_name,
+                                                        qos=_qos,
+                                                        msg=NUM_MESSAGES,
+                                                        clients=math.floor(NUM_SUBSCRIBERS / len(_subscribers)),
+                                                        folder=_path,
+                                                        name="{}_{}".format(_file_name, indx))
 
         os.system(subscriber_cmd)
         print("Subscriber {id} created".format(id=sub))
@@ -97,28 +101,28 @@ def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
 
     print("Creating publisher {id}...".format(id=_publisher))
     publisher_cmd = "docker exec -t mn.pub{id_pub} mqtt-benchmark --broker tcp://10.0.{id_pub}.100:1883 " \
-                    "--topic {topic} --clients {clients} --count {msg} --qos {qos} --delay {rate} --folder {folder} --file-name {name}".format(
-        id_pub=_publisher,
-        topic=topic_name,
-        qos=_qos,
-        msg=NUM_MESSAGES,
-        clients=NUM_PUBLISHERS,
-        rate=message_delay,
-        folder=_path,
-        name=_file_name)
+                    "--topic {topic} --clients {clients} --count {msg} --qos {qos} --delay {rate} " \
+                    "--folder {folder} --file-name {name}".format(
+                                                                id_pub=_publisher,
+                                                                topic=topic_name,
+                                                                qos=_qos,
+                                                                msg=NUM_MESSAGES,
+                                                                clients=NUM_PUBLISHERS,
+                                                                rate=message_delay,
+                                                                folder=_path,
+                                                                name=_file_name)
 
     os.system(publisher_cmd)
 
 
-def main():
-    print_details()
-
+def simulation(sim_num):
     for q in qos_list:
         for loc, clients in locality_dict.items():
-            path = "experiments/{day}/{type}/{minute}/{qos}qos/{local}locality/".format(
+            path = "experiments/{day}/{type}/{minute}/{sim}/{qos}qos/{local}locality/".format(
                 day=START_DAY,
                 type=BROKER_TYPE,
                 minute=START_MINUTE,
+                sim=sim_num,
                 qos=q,
                 local=loc)
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -127,6 +131,7 @@ def main():
             print("+++ Directory path: {}".format(path))
             print()
             print("-" * 20)
+            print("Sim num {}".format(sim_num))
             print("Locality: {}%".format(loc))
             print("QoS: {}".format(q))
             for key, client in clients.items():
@@ -139,26 +144,37 @@ def main():
             stats_pid = start_statistics(path)
             tcpdump_pid = start_tcpdump(path)
 
-            time.sleep(DELAY/5)
+            time.sleep(DELAY / 5)
             start_clients(sub_list, publisher, q, path, file_name)
 
-            print("\n>>> Simulation {}% locality - {} qos - pub {} - sub {}... DONE\n".format(
-                loc, q, NUM_PUBLISHERS, NUM_SUBSCRIBERS))
+            print("\n>>> Simulation number {}. {}% locality - {} qos - pub {} - sub {}... DONE\n".format(
+                sim_num, loc, q, NUM_PUBLISHERS, NUM_SUBSCRIBERS))
 
-            time.sleep(DELAY/2)
+            time.sleep(DELAY / 2)
 
             # kill other processes
             os.killpg(os.getpgid(stats_pid.pid), signal.SIGTERM)
             for pid in tcpdump_pid:
                 pid.kill()
 
-            time.sleep(DELAY/4)
+            time.sleep(DELAY / 4)
 
-        time.sleep(DELAY/2)
+        time.sleep(DELAY / 2)
+
+
+def main():
+    print_details()
+
+    for sim in range(1, NUMBER_SIMULATIONS+1):
+        simulation(sim)
+        print("Simulation level {} done".format(sim))
+        print("-"*20)
+        time.sleep(DELAY * 2)
 
 
 if __name__ == "__main__":
-    print(">>> EXPERIMENTS version 7.0 <<<")
+    print(">>> Experiments, software version 7.0 <<<")
+    print("Looking at life through the eyes of a tired hub...")
     START_DAY = datetime.now().strftime("%m-%d")
     START_MINUTE = datetime.now().strftime("%H%M%S")
     args = arg_parse()
