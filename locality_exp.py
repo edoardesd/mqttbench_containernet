@@ -11,15 +11,16 @@ import pprint as pp
 from datetime import datetime
 from pathlib import Path
 
-NUM_SUBSCRIBERS = 150
-NUM_PUBLISHERS = math.floor(NUM_SUBSCRIBERS / 100)
-NUMBER_SIMULATIONS = 5
+NUM_SUBSCRIBERS = 15
+NUM_PUBLISHERS = 1
+NUMBER_SIMULATIONS = 1
 qos_list = [0, 1, 2]
+qos_list = [0]
 topic_name = "topic"
 message_delay = 1
 CLUSTER_SIZE = 5
 
-DELAY = 20
+DELAY = 5
 
 locality_dict = {
     0: {
@@ -83,9 +84,8 @@ def start_tcpdump(_path):
 def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
     random.shuffle(_subscribers)
     for indx, sub in enumerate(_subscribers):
-        print(_file_name + str(indx))
-        subscriber_cmd = "docker exec -t mn.sub{id} python sub_thread.py -h 10.0.{id}.100 " \
-                         "-t {topic} -q {qos} -m {msg} -c {clients} --folder {folder} --file-name {name} &".format(
+        subscriber_cmd = "docker exec -d mn.sub{id} python3 mosquitto_sub.py -h 10.0.{id}.100 " \
+                         "-t {topic} -q {qos} -m {msg} -c {clients} --folder {folder} --file-name {name}".format(
                                                         id=sub,
                                                         topic=topic_name,
                                                         qos=_qos,
@@ -94,7 +94,7 @@ def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
                                                         folder=_path,
                                                         name="{}_{}".format(_file_name, indx))
 
-        os.system(subscriber_cmd)
+        subprocess.Popen(subscriber_cmd, shell=True)
         print("Subscriber {id} created".format(id=sub))
 
     time.sleep(DELAY)
@@ -113,7 +113,6 @@ def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
                                                                 name=_file_name)
 
     os.system(publisher_cmd)
-
 
 def simulation(sim_num):
     for q in qos_list:
@@ -151,6 +150,16 @@ def simulation(sim_num):
                 sim_num, loc, q, NUM_PUBLISHERS, NUM_SUBSCRIBERS))
 
             time.sleep(DELAY / 2)
+
+            # kill mosquitto_sub pids
+            for sub_id in sub_list:
+                ps_cmd = "docker exec -t mn.sub{} ps | grep python3 | awk '{{print $1}}'".format(sub_id)
+                sub_pid = subprocess.getoutput(ps_cmd)
+                sub_pid = [int(x) for x in sub_pid.split("\n") if x]
+                for pid in sub_pid:
+                    cmd = "docker exec -t mn.sub{} kill -2 {}".format(sub_id, int(pid))
+                    print(cmd)
+                    subprocess.getoutput(cmd)
 
             # kill other processes
             os.killpg(os.getpgid(stats_pid.pid), signal.SIGTERM)
