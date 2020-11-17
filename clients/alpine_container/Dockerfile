@@ -1,4 +1,4 @@
-ARG BASEIMAGE=python:3.8.5-alpine3.12
+ARG BASEIMAGE=python:2.8.5-alpine3.12
 
 FROM ${BASEIMAGE}
 
@@ -12,7 +12,8 @@ RUN apk add iputils \
     net-tools \
     iperf \
     xterm \
-    busybox-extras
+    busybox-extras \
+    moreutils
 
 RUN apk add bash
 
@@ -22,6 +23,7 @@ WORKDIR /home/ubuntu
 
 COPY sub_thread.py /home/ubuntu/sub_thread.py
 COPY pub_thread.py /home/ubuntu/pub_thread.py
+COPY mosquitto_sub.py /home/ubuntu/mosquitto_sub.py
 
 #CMD ["/usr/local/bin/python3", "-u", "container_python.py"]
 
