@@ -27,10 +27,10 @@ CPU_ANTLAB = 12
 IMAGES = {
     "EMQX": "flipperthedog/emqx-ip:latest",
     "VERNEMQ": "francigjeci/vernemq-debian:latest",
-    "RABBITMQ": "flipperthedog/rabbitmq:ping",
+    "RABBITMQ": "flipperthedog/rabbit-alpine",
     "HIVEMQ": "francigjeci/hivemq:dns-image",
     "MOSQUITTO": "flipperthedog/mosquitto:latest",
-    "SUBSCRIBER": "flipperthedog/alpine_client:latest",
+    "SUBSCRIBER": "flipperthedog/alpine_client:mosquitto",
     "PUBLiSHER": "flipperthedog/go_publisher:latest"
 
 }
@@ -103,10 +103,10 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route,
                                      1883: bind_ip},
                       volumes=[
                           "{}:/etc/rabbitmq/rabbitmq.conf".format(dest_file),
-                          PWD + "/confiles/enabled_plugins:/etc/rabbitmq/enabled_plugins"],
+                          PWD + "/confiles/enabled_plugins:/etc/rabbitmq/enabled_plugins",
+                          PWD + "/confiles/erlang_cookie:/var/lib/rabbitmq/.erlang_cookie"],
                       mem_limit=args.ram_limit,
-                      cpuset_cpus=cpu,
-                      environment={"RABBITMQ_ERLANG_COOKIE": "GPLDKBRJYMSKLTLZQDVG"})
+                      cpuset_cpus=cpu)
 
     for i in range(TOTAL_BROKERS):
         _ip = "{}{}.100".format(IP_ADDR, i)
