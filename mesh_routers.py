@@ -27,7 +27,7 @@ CPU_ANTLAB = 12
 IMAGES = {
     "EMQX": "flipperthedog/emqx-ip:latest",
     "VERNEMQ": "francigjeci/vernemq-debian:latest",
-    "RABBITMQ": "flipperthedog/rabbit-alpine",
+    "RABBITMQ": "flipperthedog/rabbitmq:ping",
     "HIVEMQ": "francigjeci/hivemq:dns-image",
     "MOSQUITTO": "flipperthedog/mosquitto:latest",
     "SUBSCRIBER": "flipperthedog/alpine_client:mosquitto",
