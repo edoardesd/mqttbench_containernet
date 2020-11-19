@@ -18,7 +18,7 @@ topic_name = "topic"
 message_delay = 1
 CLUSTER_SIZE = 5
 
-DELAY = 5
+DELAY = 10
 
 locality_dict = {
     0: {
@@ -44,6 +44,10 @@ def arg_parse():
                         help='number of subscribers', type=int)
     parser.add_argument('-t', '--type', dest='BROKER_TYPE', required=True,
                         help='Cluster type')
+    parser.add_argument('-n', '--sim-number', dest='SIMULATIONS', default=1,
+                        help='number of iterations', type=int)
+    parser.add_argument('--speed', dest='DELAY', default=10,
+                        help='sleep between stuff', type=int)
 
     return parser.parse_args()
 
@@ -202,4 +206,6 @@ if __name__ == "__main__":
     NUM_MESSAGES = args.NUM_MESSAGES
     BROKER_TYPE = args.BROKER_TYPE
     NUM_SUBSCRIBERS = args.NUM_SUBSCRIBERS
+    NUMBER_SIMULATIONS = args.SIMULATIONS
+    DELAY = args.DELAY
     main()
