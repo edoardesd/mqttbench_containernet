@@ -11,11 +11,9 @@ import pprint as pp
 from datetime import datetime
 from pathlib import Path
 
-NUM_SUBSCRIBERS = 15
 NUM_PUBLISHERS = 1
 NUMBER_SIMULATIONS = 1
 qos_list = [0, 1, 2]
-qos_list = [0]
 topic_name = "topic"
 message_delay = 1
 CLUSTER_SIZE = 5
@@ -42,6 +40,8 @@ def arg_parse():
     parser = argparse.ArgumentParser(description='Locality experiment', add_help=False)
     parser.add_argument('-m', '--messages', dest='NUM_MESSAGES', default=5,
                         help='number of published messages', type=int)
+    parser.add_argument('-s', '--subscribers', dest="NUM_SUBSCRIBERS", default=15,
+                        help='number of subscribers', type=int)
     parser.add_argument('-t', '--type', dest='BROKER_TYPE', required=True,
                         help='Cluster type')
 
@@ -95,7 +95,7 @@ def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
                                                         name="{}_{}".format(_file_name, indx))
 
         subprocess.Popen(subscriber_cmd, shell=True)
-        print("Subscriber {id} created".format(id=sub))
+        print("Subscriber {index} created. Broker {id}".format(index=indx, id=sub))
 
     time.sleep(DELAY)
 
@@ -114,6 +114,7 @@ def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
 
     os.system(publisher_cmd)
 
+
 def simulation(sim_num):
     for q in qos_list:
         for loc, clients in locality_dict.items():
@@ -127,9 +128,11 @@ def simulation(sim_num):
             Path(path).mkdir(parents=True, exist_ok=True)
             file_name = "{}sub{}pub".format(NUM_SUBSCRIBERS, NUM_PUBLISHERS)
 
-            print("+++ Directory path: {}".format(path))
             print()
-            print("-" * 20)
+            print("-" * 80)
+            print("++ Directory path: {}".format(path))
+            print("-" * 80)
+            print()
             print("Sim num {}".format(sim_num))
             print("Locality: {}%".format(loc))
             print("QoS: {}".format(q))
@@ -152,14 +155,21 @@ def simulation(sim_num):
             time.sleep(DELAY / 2)
 
             # kill mosquitto_sub pids
+            print("Killing in the name! (subscribers)")
             for sub_id in sub_list:
                 ps_cmd = "docker exec -t mn.sub{} ps | grep python3 | awk '{{print $1}}'".format(sub_id)
                 sub_pid = subprocess.getoutput(ps_cmd)
                 sub_pid = [int(x) for x in sub_pid.split("\n") if x]
                 for pid in sub_pid:
                     cmd = "docker exec -t mn.sub{} kill -2 {}".format(sub_id, int(pid))
-                    print(cmd)
+                    print("-- {}".format(cmd))
                     subprocess.getoutput(cmd)
+
+            # if needed cat e2e_* > e2e_all.txt
+            print("Creating single e2e file...")
+            subprocess.getoutput("cat {path}/e2e_* > {path}/delay_e2e_all.txt".format(path=path))
+            subprocess.getoutput("mkdir {path}/e2e_raw".format(path=path))
+            subprocess.getoutput("mv {path}/e2e_* {path}/e2e_raw".format(path=path))
 
             # kill other processes
             os.killpg(os.getpgid(stats_pid.pid), signal.SIGTERM)
@@ -176,8 +186,10 @@ def main():
 
     for sim in range(1, NUMBER_SIMULATIONS+1):
         simulation(sim)
+        print()
+        print("-"*50)
         print("Simulation level {} done".format(sim))
-        print("-"*20)
+        print("-"*50)
         time.sleep(DELAY * 2)
 
 
@@ -189,4 +201,5 @@ if __name__ == "__main__":
     args = arg_parse()
     NUM_MESSAGES = args.NUM_MESSAGES
     BROKER_TYPE = args.BROKER_TYPE
+    NUM_SUBSCRIBERS = args.NUM_SUBSCRIBERS
     main()

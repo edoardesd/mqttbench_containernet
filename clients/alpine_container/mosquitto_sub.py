@@ -17,7 +17,7 @@ def kill_processes():
 
     fix_files = "find {} -type f -name 'e2e*' -exec sed -i 's/\.//g;s/ /,/g' {{}} \;".format(args.folder)
     subprocess.Popen(fix_files, shell=True)
-    # if needed cat e2e_c0* > merged.txt
+
     sys.exit(1)
 
 
@@ -56,6 +56,7 @@ def main():
         mosq_pid.append(subprocess.Popen(mosquitto_cmd, stdout=f, shell=True, preexec_fn=os.setsid))
         file_out.append(f)
 
+    # receiver_brk,receiver_id,src_brk,client_num,sent,msg_id,received,qos
     time.sleep(total_wait)
 
     print("SUBSCRIBER {} is done receiving".format(broker_num[2]))
