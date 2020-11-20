@@ -59,8 +59,7 @@ def main():
     # receiver_brk,receiver_id,src_brk,client_num,sent,msg_id,received,qos
     time.sleep(total_wait)
 
-    print("SUBSCRIBER {} is done receiving".format(broker_num[2]))
-    print("kill by timeout")
+    print("Kill by timeout")
     kill_processes()
 
 
@@ -74,7 +73,7 @@ if __name__ == "__main__":
     args = arg_parse()
     broker_num = "_b" + args.host.split('.')[2] + "_"
     file_name = broker_num + args.file_name + ".txt"
-    total_wait = args.msg_num * 2
+    total_wait = args.msg_num * 5
     print(">>> folder by sub: ", args.folder)
     print(">>>> file name: ", file_name)
     Path(args.folder).mkdir(parents=True, exist_ok=True)

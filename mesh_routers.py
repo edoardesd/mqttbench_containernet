@@ -30,7 +30,7 @@ IMAGES = {
     "RABBITMQ": "flipperthedog/rabbitmq:ping",
     "HIVEMQ": "francigjeci/hivemq:dns-image",
     "MOSQUITTO": "flipperthedog/mosquitto:latest",
-    "SUBSCRIBER": "flipperthedog/alpine_client:mosquitto",
+    "SUBSCRIBER": "flipperthedog/alpine_client:latest",
     "PUBLiSHER": "flipperthedog/go_publisher:latest"
 
 }
