@@ -160,20 +160,46 @@ def start_hivemq(cont_name, cont_address, bind_ip, master_node, default_route, c
 
 
 def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
-    return net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
+    dest_file = "{}/confiles/vernemq{}.conf".format(PWD, cont_address[5:-7])
+
+    with open(dest_file, "w") as f:
+        f.write("\naccept_eula=yes")
+        # f.write("\nnodename={}".format(cont_address[:-3]))
+        f.write("\nallow_anonymous=on\nlog.console=console")
+        f.write("\nerlang.distribution.port_range.minimum = 9100")
+        f.write("\nerlang.distribution.port_range.maximum = 9109")
+        f.write("\nlistener.tcp.default = ###IPADDRESS###:1883")
+        f.write("\nlistener.ws.default = ###IPADDRESS###:8080")
+        f.write("\nlistener.vmq.clustering = ###IPADDRESS###:44053")
+        f.write("\nlistener.http.metrics = ###IPADDRESS###:8888")
+        f.write("\n########## End ##########")
+
+
+
+    d = net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
                          defaultRoute='via {}'.format(default_route),
                          dimage=IMAGES["VERNEMQ"],
                          ports=[1883], port_bindings={1883: bind_ip},
                          mem_limit=args.ram_limit,
                          cpuset_cpus=cpu,
+                        volumes=[
+                          "{}/confiles/verne_build.sh:/usr/sbin/start_vernemq.sh".format(PWD),
+                          "{}:/vernemq/etc/vernemq.conf.local".format(dest_file)],
                          environment={
                              "DOCKER_VERNEMQ_NODENAME": cont_address[:-3],
                              "DOCKER_VERNEMQ_DISCOVERY_NODE": master_node[master_node.index("@") + 1:-3],
-                             "DOCKER_VERNEMQ_ACCEPT_EULA": "yes",
-                             "DOCKER_VERNEMQ_ALLOW_ANONYMOUS": "on",
-                             "DOCKER_VERNEMQ_LISTENER.tcp.containernet": cont_address[:-3] + ":1883"
-                         })
+                             # "DOCKER_VERNEMQ_ACCEPT_EULA": "yes",
+                             # "DOCKER_VERNEMQ_ALLOW_ANONYMOUS": "on",
+                             # "DOCKER_VERNEMQ_LISTENER.tcp.containernet": cont_address[:-3] + ":1883"
+                         }
+    )
 
+    # d.cmd("sed -i '$ d' /etc/hosts")
+    for i in range(TOTAL_BROKERS):
+        _ip = "{}{}.100".format(IP_ADDR, i)
+        d.cmd('echo "{}      {}" >> /etc/hosts'.format(_ip, "vernemq" + str(i)))
+
+    return d
 
 def start_mosquitto(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
     dest_file = "{}/confiles/mosquitto{}.conf".format(PWD, cont_address[5:-7])
@@ -425,6 +451,16 @@ def main():
 
     info('\n*** Waiting the network start up ({} secs)...\n'.format(args.router_delay / 2))
     time.sleep(args.router_delay / 2)
+
+    info('\n kinning net')
+    for c in container_list:
+        c.cmd("ip link set eth0 down")
+
+    for s in sub_list:
+        s.cmd("ip link set eth0 down")
+
+    for p in pub_list:
+        p.cmd("ip link set eth0 down")
 
     info('\n*** Starting the entrypoints\n')
     # START CONTAINERS
