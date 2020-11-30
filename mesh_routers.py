@@ -27,7 +27,7 @@ CPU_ANTLAB = 12
 IMAGES = {
     "EMQX": "flipperthedog/emqx-ip:latest",
     "VERNEMQ": "francigjeci/vernemq-debian:latest",
-    "RABBITMQ": "flipperthedog/rabbitmq:ping",
+    "RABBITMQ": "flipperthedog/rabbit-alpine:latest",
     "HIVEMQ": "francigjeci/hivemq:dns-image",
     "MOSQUITTO": "flipperthedog/mosquitto:latest",
     "SUBSCRIBER": "flipperthedog/alpine_client:latest",
@@ -188,11 +188,7 @@ def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route, 
                          environment={
                              "DOCKER_VERNEMQ_NODENAME": cont_address[:-3],
                              "DOCKER_VERNEMQ_DISCOVERY_NODE": master_node[master_node.index("@") + 1:-3],
-                             # "DOCKER_VERNEMQ_ACCEPT_EULA": "yes",
-                             # "DOCKER_VERNEMQ_ALLOW_ANONYMOUS": "on",
-                             # "DOCKER_VERNEMQ_LISTENER.tcp.containernet": cont_address[:-3] + ":1883"
-                         }
-    )
+                         })
 
     # d.cmd("sed -i '$ d' /etc/hosts")
     for i in range(TOTAL_BROKERS):
