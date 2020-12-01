@@ -13,6 +13,7 @@ from shutil import copyfile
 import ipaddress
 import itertools
 import os
+import subprocess
 import time
 import xml.etree.ElementTree as ET
 
@@ -145,7 +146,7 @@ def start_hivemq(cont_name, cont_address, bind_ip, master_node, default_route, c
             cluster_nodes.append(_new_node)
 
         config_file.write(dest_file)
-
+        hive_license = subprocess.check_output("cat {}/confiles/hivemq.lic | base64 -w 0".format(PWD), shell=True)
         return net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
                              defaultRoute='via {}'.format(default_route),
                              ports=[1883], port_bindings={1883: bind_ip},
@@ -155,7 +156,8 @@ def start_hivemq(cont_name, cont_address, bind_ip, master_node, default_route, c
                              mem_limit=args.ram_limit,
                              cpuset_cpus=cpu,
                              environment={
-                                 "HIVEMQ_BIND_ADDRESS": cont_address[:-3]
+                                 "HIVEMQ_BIND_ADDRESS": cont_address[:-3],
+                                 "HIVEMQ_LICENSE": hive_license
                              })
 
 
