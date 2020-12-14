@@ -29,7 +29,8 @@ IMAGES = {
     "EMQX": "flipperthedog/emqx-ip:latest",
     "VERNEMQ": "francigjeci/vernemq-debian:latest",
     "RABBITMQ": "flipperthedog/rabbitmq_alpine:latest",
-    "HIVEMQ": "francigjeci/hivemq:dns-image",
+    # "HIVEMQ": "francigjeci/hivemq:dns-image",
+    "HIVEMQ": "flipperthedog/hive_alpine_dns:latest",
     "MOSQUITTO": "flipperthedog/mosquitto:latest",
     "SUBSCRIBER": "flipperthedog/alpine_client:latest",
     "PUBLiSHER": "flipperthedog/go_publisher:latest"
