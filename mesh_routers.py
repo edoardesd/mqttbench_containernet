@@ -30,7 +30,7 @@ IMAGES = {
     "VERNEMQ": "francigjeci/vernemq-debian:latest",
     "RABBITMQ": "flipperthedog/rabbitmq_alpine:latest",
     # "HIVEMQ": "francigjeci/hivemq:dns-image",
-    "HIVEMQ": "flipperthedog/hive_alpine:latest",
+    "HIVEMQ": "flipperthedog/hivemq_alpine:latest",
     "MOSQUITTO": "flipperthedog/mosquitto:latest",
     "SUBSCRIBER": "flipperthedog/alpine_client:latest",
     "PUBLiSHER": "flipperthedog/go_publisher:latest"
