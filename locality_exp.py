@@ -18,6 +18,9 @@ topic_name = "topic"
 message_delay = 1
 CLUSTER_SIZE = 5
 
+MESSAGE_TIME = 51
+CLIENTS_CREATION = 5
+
 DELAY = 10
 
 locality_dict = {
@@ -48,6 +51,10 @@ def arg_parse():
                         help='number of iterations', type=int)
     parser.add_argument('--speed', dest='DELAY', default=10,
                         help='sleep between stuff', type=int)
+    parser.add_argument('--no-messages', dest='no_messages', default=False, action='store_true',
+                        help='do not send messages')
+    parser.add_argument('--no-clients', dest='no_clients', default=False, action='store_true',
+                        help='do not load pubs and subs')
 
     return parser.parse_args()
 
@@ -86,24 +93,29 @@ def start_tcpdump(_path):
 
 
 def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
-    random.shuffle(_subscribers)
-    for indx, sub in enumerate(_subscribers):
-        subscriber_cmd = "docker exec -d mn.sub{id} python3 mosquitto_sub.py -h 10.0.{id}.100 " \
-                         "-t {topic} -q {qos} -m {msg} -c {clients} --folder {folder} --file-name {name}".format(
-                                                        id=sub,
-                                                        topic=topic_name,
-                                                        qos=_qos,
-                                                        msg=NUM_MESSAGES,
-                                                        clients=math.floor(NUM_SUBSCRIBERS / len(_subscribers)),
-                                                        folder=_path,
-                                                        name="{}_{}".format(_file_name, indx))
+    if args.no_clients:
+        print("no clients, waiting...")
+        time.sleep(CLIENTS_CREATION)
+    else:
+        random.shuffle(_subscribers)
+        for indx, sub in enumerate(_subscribers):
+            subscriber_cmd = "docker exec -d mn.sub{id} python3 mosquitto_sub.py -h 10.0.{id}.100 " \
+                             "-t {topic} -q {qos} -m {msg} -c {clients} --folder {folder} --file-name {name}".format(
+                                                            id=sub,
+                                                            topic=topic_name,
+                                                            qos=_qos,
+                                                            msg=NUM_MESSAGES,
+                                                            clients=math.floor(NUM_SUBSCRIBERS / len(_subscribers)),
+                                                            folder=_path,
+                                                            name="{}_{}".format(_file_name, indx))
 
-        subprocess.Popen(subscriber_cmd, shell=True)
-        print("Subscriber {index} created. Broker {id}".format(index=indx, id=sub))
+            subprocess.Popen(subscriber_cmd, shell=True)
+            print("Subscriber {index} created. Broker {id}".format(index=indx, id=sub))
 
     time.sleep(DELAY)
 
     print("Creating publisher {id}...".format(id=_publisher))
+
     publisher_cmd = "docker exec -t mn.pub{id_pub} mqtt-benchmark --broker tcp://10.0.{id_pub}.100:1883 " \
                     "--topic {topic} --clients {clients} --count {msg} --qos {qos} --delay {rate} " \
                     "--folder {folder} --file-name {name}".format(
@@ -116,7 +128,11 @@ def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
                                                                 folder=_path,
                                                                 name=_file_name)
 
-    os.system(publisher_cmd)
+    if args.no_messages or args.no_clients:
+        print("no messages, waiting...")
+        time.sleep(MESSAGE_TIME)
+    else:
+        os.system(publisher_cmd)
 
 
 def simulation(sim_num):
@@ -151,6 +167,7 @@ def simulation(sim_num):
             tcpdump_pid = start_tcpdump(path)
 
             time.sleep(DELAY / 5)
+
             start_clients(sub_list, publisher, q, path, file_name)
 
             print("\n>>> Simulation number {}. {}% locality - {} qos - pub {} - sub {}... DONE\n".format(
