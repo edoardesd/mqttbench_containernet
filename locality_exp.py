@@ -16,7 +16,7 @@ NUMBER_SIMULATIONS = 1
 qos_list = [0, 1, 2]
 topic_name = "topic"
 message_delay = 1
-CLUSTER_SIZE = 5
+CLUSTER_SIZE = 2
 
 MESSAGE_TIME = 51
 CLIENTS_CREATION = 5
@@ -55,6 +55,8 @@ def arg_parse():
                         help='do not send messages')
     parser.add_argument('--no-clients', dest='no_clients', default=False, action='store_true',
                         help='do not load pubs and subs')
+    parser.add_argument('-b', '--brokers', dest='num_broker', default=CLUSTER_SIZE,
+                        help='cluster size', type=int)
 
     return parser.parse_args()
 
@@ -224,5 +226,6 @@ if __name__ == "__main__":
     BROKER_TYPE = args.BROKER_TYPE
     NUM_SUBSCRIBERS = args.NUM_SUBSCRIBERS
     NUMBER_SIMULATIONS = args.SIMULATIONS
+    CLUSTER_SIZE = args.num_broker
     DELAY = args.DELAY
     main()
