@@ -41,7 +41,7 @@
 
             	    	
             <static>
-                <node><host>10.0.0.100</host><port>8000</port></node><node><host>10.0.1.100</host><port>8000</port></node><node><host>10.0.2.100</host><port>8000</port></node><node><host>10.0.3.100</host><port>8000</port></node><node><host>10.0.4.100</host><port>8000</port></node></static>
+                <node><host>10.0.0.100</host><port>8000</port></node><node><host>10.0.1.100</host><port>8000</port></node><node><host>10.0.2.100</host><port>8000</port></node></static>
 
         </discovery>
     </cluster>

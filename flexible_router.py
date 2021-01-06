@@ -13,7 +13,6 @@ import ipaddress
 import itertools
 import math
 import os
-import re
 import subprocess
 import time
 import xml.etree.ElementTree as ET
@@ -123,7 +122,7 @@ def start_emqx(container):
                          defaultRoute='via {}'.format(container.default_route),
                          dimage=IMAGES["EMQX"],
                          ports=[1883], port_bindings={1883: container.bind_port},
-                         mem_limit=args.ram_limit,
+                         mem_limit=container.ram,
                          cpuset_cpus=container.cpu,
                          environment={"EMQX_NAME": container.name,
                                       "EMQX_HOST": container.address[:-3],
@@ -134,28 +133,28 @@ def start_emqx(container):
                                       })
 
 
-def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
-    dest_file = "{}/confiles/rabbitmq{}.conf".format(PWD, cont_address[5:-7])
+def start_rabbitmq(container):
+    dest_file = "{}/confiles/rabbitmq{}.conf".format(PWD, container.address[5:-7])
     copyfile(PWD + "/confiles/rabbitmq.conf", dest_file)
     with open(dest_file, "a") as f:
         c = 0
         for i in range(TOTAL_BROKERS):
             _ip = "{}{}.100/24".format(IP_ADDR, i)
-            if _ip != cont_address:
+            if _ip != container.address:
                 c += 1
                 f.write("cluster_formation.classic_config.nodes.{} = rabbit@rabbitmq{}\n".format(c, i))
 
-    d = net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
-                      defaultRoute='via {}'.format(default_route),
+    d = net.addDocker(hostname=container.name, name=container.name, ip=container.address,
+                      defaultRoute='via {}'.format(container.default_route),
                       dimage=IMAGES["RABBITMQ"],
                       ports=[5672, 1883],
-                      port_bindings={5672: 5670 + (bind_ip - 1880),
-                                     1883: bind_ip},
+                      port_bindings={5672: 5670 + (container.bind_port - 1880),
+                                     1883: container.bind_port},
                       volumes=[
                           "{}:/etc/rabbitmq/rabbitmq.conf".format(dest_file),
                           PWD + "/confiles/enabled_plugins:/etc/rabbitmq/enabled_plugins"],
-                      mem_limit=args.ram_limit,
-                      cpuset_cpus=cpu,
+                      mem_limit=container.ram,
+                      cpuset_cpus=container.cpu,
                       environment={"RABBITMQ_ERLANG_COOKIE": "GPLDKBRJYMSKLTLZQDVG"})
 
     for i in range(TOTAL_BROKERS):
@@ -165,13 +164,11 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route,
     return d
 
 
-def start_hivemq(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
-    my_id = cont_address[5:-7]
+def start_hivemq(container):
     source_config_file_path = os.path.join(PWD, 'confiles/config-dns.xml')
-    dest_file = "{}/confiles/config-dns_{}.xml".format(PWD, my_id)
+    dest_file = "{}/confiles/config-dns_{}.xml".format(PWD, container.id)
 
     __port = 8000
-    print("bind_ip", bind_ip)
     config_file = ET.parse(source_config_file_path)
     cluster_nodes = config_file.getroot().find('cluster').find('discovery').find('static')
     if cluster_nodes is None:
@@ -195,28 +192,24 @@ def start_hivemq(cont_name, cont_address, bind_ip, master_node, default_route, c
             cluster_nodes.append(_new_node)
 
         config_file.write(dest_file)
-        if my_id == 0:
-            print("no licence")
-            hive_license = ""
-        else:
-            hive_license = subprocess.check_output("cat {}/confiles/hivemq.lic | base64 -w 0".format(PWD), shell=True)
+        hive_license = subprocess.check_output("cat {}/confiles/hivemq.lic | base64 -w 0".format(PWD), shell=True)
 
-        return net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
-                             defaultRoute='via {}'.format(default_route),
-                             ports=[1883], port_bindings={1883: bind_ip},
+        return net.addDocker(hostname=container.name, name=container.name, ip=container.address,
+                             defaultRoute='via {}'.format(container.default_route),
+                             ports=[1883], port_bindings={1883: container.bind_port},
                              dimage=IMAGES["HIVEMQ"],
                              volumes=[
-                                 PWD + "/confiles/config-dns_{}.xml:/opt/hivemq/conf/config.xml".format(my_id)],
-                             mem_limit=args.ram_limit,
-                             cpuset_cpus=cpu,
+                                 PWD + "/confiles/config-dns_{}.xml:/opt/hivemq/conf/config.xml".format(container.id)],
+                             mem_limit=container.ram,
+                             cpuset_cpus=container.cpu,
                              environment={
-                                 "HIVEMQ_BIND_ADDRESS": cont_address[:-3],
+                                 "HIVEMQ_BIND_ADDRESS": container.address[:-3],
                                  "HIVEMQ_LICENSE": hive_license
                              })
 
 
-def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
-    dest_file = "{}/confiles/vernemq{}.conf".format(PWD, cont_address[5:-7])
+def start_vernemq(container):
+    dest_file = "{}/confiles/vernemq{}.conf".format(PWD, container.id)
 
     with open(dest_file, "w") as f:
         f.write("\naccept_eula=yes")
@@ -229,18 +222,18 @@ def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route, 
         f.write("\nlistener.http.metrics = ###IPADDRESS###:8888")
         f.write("\n########## End ##########")
 
-    d = net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
-                      defaultRoute='via {}'.format(default_route),
+    d = net.addDocker(hostname=container.name, name=container.name, ip=container.address,
+                      defaultRoute='via {}'.format(container.default_route),
                       dimage=IMAGES["VERNEMQ"],
-                      ports=[1883], port_bindings={1883: bind_ip},
-                      mem_limit=args.ram_limit,
-                      cpuset_cpus=cpu,
+                      ports=[1883], port_bindings={1883: container.bind_port},
+                      mem_limit=container.ram,
+                      cpuset_cpus=container.cpu,
                       volumes=[
                           "{}/confiles/verne_build.sh:/usr/sbin/start_vernemq.sh".format(PWD),
                           "{}:/vernemq/etc/vernemq.conf.local".format(dest_file)],
                       environment={
-                          "DOCKER_VERNEMQ_NODENAME": cont_address[:-3],
-                          "DOCKER_VERNEMQ_DISCOVERY_NODE": master_node[master_node.index("@") + 1:-3],
+                          "DOCKER_VERNEMQ_NODENAME": container.address[:-3],
+                          "DOCKER_VERNEMQ_DISCOVERY_NODE": container.master[container.master.index("@") + 1:-3],
                       })
 
     for i in range(TOTAL_BROKERS):
@@ -250,19 +243,20 @@ def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route, 
     return d
 
 
-def start_mosquitto(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
-    dest_file = "{}/confiles/mosquitto{}.conf".format(PWD, cont_address[5:-7])
+def start_mosquitto(container):
+#def start_mosquitto(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
+    dest_file = "{}/confiles/mosquitto{}.conf".format(PWD, container.id)
 
     with open(dest_file, "w") as f:
         f.write("persistence true\npersistence_location /mosquitto/data/\n")
         f.write("log_dest file /mosquitto/log/mosquitto.log\n")
         f.write("log_dest stdout\nlog_type all")
 
-    if cont_name in master_node:
+    if container.name in container.master:
         print("master master")
         for i in range(TOTAL_BROKERS):
             _ip = "{}{}.100/24".format(IP_ADDR, i)
-            if _ip != cont_address:
+            if _ip != container.address:
                 with open(dest_file, "a") as f:
                     f.write("\nconnection id_{}\n".format(i))
                     f.write("address {}:{}\n".format(_ip[:-3], 1883))
@@ -270,13 +264,13 @@ def start_mosquitto(cont_name, cont_address, bind_ip, master_node, default_route
                     f.write("remote_clientid id_{}\n\n".format(i))
                     f.write("keepalive_interval 5")
 
-    return net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
-                         defaultRoute='via {}'.format(default_route),
+    return net.addDocker(hostname=container.name, name=container.name, ip=container.address,
+                         defaultRoute='via {}'.format(container.default_route),
                          dimage=IMAGES["MOSQUITTO"],
                          volumes=["{}:/mosquitto/config/mosquitto.conf".format(dest_file)],
-                         ports=[1883], port_bindings={1883: bind_ip},
-                         mem_limit=args.ram_limit,
-                         cpuset_cpus=cpu
+                         ports=[1883], port_bindings={1883: container.bind_port},
+                         mem_limit=container.ram,
+                         cpuset_cpus=container.cpu
                          )
 
 
