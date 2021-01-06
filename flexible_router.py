@@ -19,7 +19,7 @@ import time
 import xml.etree.ElementTree as ET
 
 PWD = os.getcwd()
-VERSION = 1
+VERSION = 2.0
 TOTAL_BROKERS = 3
 DELAY = 10
 BRIDGE_QOS = 2
@@ -39,15 +39,35 @@ IMAGES = {
 }
 
 
+class MyContainer:
+    def __init__(self, _id, cluster_type, router_ip, cpu):
+        self.cluster_type = cluster_type
+        self.id = _id
+        self.name = "{}{}".format(self.cluster_type, self.id)
+        self.router_ip = router_ip
+        self.default_route = self.router_ip[1].compressed
+        self.address = "{}/24".format(self.router_ip[100].compressed)
+        self.bind_port = 1880 + self.id
+        self.master = "{}@{}".format(self.name, self.address)
+        self.cpu = cpu
+        self.ram = args.ram_limit
+
+    def get_master(self):
+        return self.master
+
+    def set_master(self, new_master):
+        self.master = new_master
+
+
 class MyRouter:
-    def __init__(self, id, networkIP):
-        self.id = id
+    def __init__(self, _id, networkIP):
+        self.id = _id
         self.name = "r{}".format(self.id)
         self.networkIP = networkIP
         self.mainIP = '{}/24'.format(next(self.networkIP.hosts()))
         self.eth_available = ['{}-eth{}'.format(self.name, eth) for eth in range(TOTAL_BROKERS)]
-        self.eth_used = []
         self.switch = None
+        self.eth_used = []
         self.routing_binding = []
         self.router = net.addHost(self.name, cls=LinuxRouter, ip=self.mainIP)
 
@@ -65,6 +85,7 @@ class MyRouter:
                     intfName=self.get_eth(),
                     params2={'ip': self.mainIP})
         return self.switch
+
 
 class LinuxRouter(Node):
     def config(self, **params):
@@ -97,19 +118,19 @@ def arg_parse():
     return parser.parse_args()
 
 
-def start_emqx(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
-    return net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
-                         defaultRoute='via {}'.format(default_route),
+def start_emqx(container):
+    return net.addDocker(hostname=container.name, name=container.name, ip=container.address,
+                         defaultRoute='via {}'.format(container.default_route),
                          dimage=IMAGES["EMQX"],
-                         ports=[1883], port_bindings={1883: bind_ip},
+                         ports=[1883], port_bindings={1883: container.bind_port},
                          mem_limit=args.ram_limit,
-                         cpuset_cpus=cpu,
-                         environment={"EMQX_NAME": cont_name,
-                                      "EMQX_HOST": cont_address[:-3],
+                         cpuset_cpus=container.cpu,
+                         environment={"EMQX_NAME": container.name,
+                                      "EMQX_HOST": container.address[:-3],
                                       "EMQX_NODE__DIST_LISTEN_MAX": 6379,
                                       "EMQX_LISTENER__TCP__EXTERNAL": 1883,
                                       "EMQX_CLUSTER__DISCOVERY": "static",
-                                      "EMQX_CLUSTER__STATIC__SEEDS": master_node[:-3]
+                                      "EMQX_CLUSTER__STATIC__SEEDS": container.master[:-3]
                                       })
 
 
@@ -122,7 +143,6 @@ def start_rabbitmq(cont_name, cont_address, bind_ip, master_node, default_route,
             _ip = "{}{}.100/24".format(IP_ADDR, i)
             if _ip != cont_address:
                 c += 1
-                # print("cluster_formation.classic_config.nodes.{} = rabbit@rabbitmq{}\n".format(c, i))
                 f.write("cluster_formation.classic_config.nodes.{} = rabbit@rabbitmq{}\n".format(c, i))
 
     d = net.addDocker(hostname=cont_name, name=cont_name, ip=cont_address,
@@ -200,7 +220,6 @@ def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route, 
 
     with open(dest_file, "w") as f:
         f.write("\naccept_eula=yes")
-        # f.write("\nnodename={}".format(cont_address[:-3]))
         f.write("\nallow_anonymous=on\nlog.console=console")
         f.write("\nerlang.distribution.port_range.minimum = 9100")
         f.write("\nerlang.distribution.port_range.maximum = 9109")
@@ -224,7 +243,6 @@ def start_vernemq(cont_name, cont_address, bind_ip, master_node, default_route, 
                           "DOCKER_VERNEMQ_DISCOVERY_NODE": master_node[master_node.index("@") + 1:-3],
                       })
 
-    # d.cmd("sed -i '$ d' /etc/hosts")
     for i in range(TOTAL_BROKERS):
         _ip = "{}{}.100".format(IP_ADDR, i)
         d.cmd('echo "{}      {}" >> /etc/hosts'.format(_ip, "vernemq" + str(i)))
@@ -266,8 +284,8 @@ def invalid(broker):
     info('Invalid {}'.format(broker))
 
 
-def assign_cpu(core_num, core_list):
-    core_per_broker = math.floor(core_num / TOTAL_BROKERS)
+def assign_cpu(core_list):
+    core_per_broker = math.floor(CORE_NUM / TOTAL_BROKERS)
 
     this_cpu = []
     for i in range(core_per_broker):
@@ -276,35 +294,27 @@ def assign_cpu(core_num, core_list):
     return ','.join(map(str, this_cpu))
 
 
-def create_containers(argument, router_ips):
+def create_containers(broker_type, _routers):
     switcher = {
-        'EMQX': start_emqx,
-        'RABBITMQ': start_rabbitmq,
-        'VERNEMQ': start_vernemq,
-        'HIVEMQ': start_hivemq,
-        'MOSQUITTO': start_mosquitto
+        'emqx': start_emqx,
+        'rabbitmq': start_rabbitmq,
+        'vernemq': start_vernemq,
+        'hivemq': start_hivemq,
+        'mosquitto': start_mosquitto
     }
-    func = switcher.get(argument, lambda: invalid())
 
+    func = switcher.get(broker_type, lambda: invalid())
     local_list = []
-
     my_master = None
 
-    cpu_use = CPU_VBOX
-    if args.cpu:
-        cpu_use = CPU_ANTLAB
-
-    core_list = list(range(0, cpu_use))
-    for count, ip in enumerate(router_ips):
-        default_route = ip[1].compressed
-        container_name = "{}{}".format(args.cluster_type, count)
-        local_address = "{}/24".format(ip[100].compressed)
-        bind_addr = 1880 + count
+    for r in _routers:
+        container = MyContainer(r.id, broker_type, r.networkIP, assign_cpu(core_list))
         if my_master is None:
-            my_master = "{}@{}".format(container_name, local_address)
+            my_master = container.get_master()
+        else:
+            container.set_master(my_master)
 
-        core_to_use = assign_cpu(cpu_use, core_list)
-        local_list.append(func(container_name, local_address, bind_addr, my_master, default_route, core_to_use))
+        local_list.append(func(container))
 
     return local_list
 
@@ -315,15 +325,11 @@ def core_network():
     info('  DONE\n')
 
     info('*** Adding routers\n')
-    _routers = [MyRouter(id=brok, networkIP=ipaddress.ip_network('10.0.{}.0/24'.format(brok)))
+    _routers = [MyRouter(_id=brok, networkIP=ipaddress.ip_network('10.0.{}.0/24'.format(brok)))
                 for brok in range(TOTAL_BROKERS)]
 
     info('*** Adding switches\n')
     _switches = [r.add_switch() for r in _routers]
-
-    #info('*** Adding router-switch links\n')
-    #for s, r in zip(_switches, _routers):
-    #    print(net.addLink(s, r.router, intfName2=r.get_eth(), params2={'ip': r.mainIP}))
 
     info('*** Adding router-router links\n')
     for (router1, router2) in list(itertools.combinations(_routers, 2)):
@@ -344,12 +350,10 @@ def core_network():
                     )
 
     info('*** Adding routing\n')
+    _cmd = "ip route add {to_reach} via {host} dev {eth_int}"
     for r in _routers:
         for bind in r.routing_binding:
-            _cmd = "ip route add {to_reach} via {host} dev {eth_int}".format(to_reach=bind[0],
-                                                                             host=bind[1],
-                                                                             eth_int=bind[2])
-            r.router.cmd(_cmd)
+            r.router.cmd(_cmd.format(to_reach=bind[0], host=bind[1], eth_int=bind[2]))
 
     return _switches, _routers
 
@@ -360,6 +364,7 @@ def main():
     info('\n\tCLUSTER TYPE: {}'.format(args.cluster_type))
     info('\n\tNUMBER OF BROKERS: {}'.format(TOTAL_BROKERS))
     info('\n\tDELAY: router: {} switch: {}'.format(args.router_delay, args.container_delay))
+    info('\n\tCORE: {}'.format(CORE_NUM))
     info('\n')
 
     switches, routers = core_network()
@@ -367,7 +372,7 @@ def main():
     router_list = [r.router for r in routers]
 
     info('\n*** Adding docker containers, type: {}\n'.format(args.cluster_type.upper()))
-    container_list = create_containers(args.cluster_type.upper(), ip_routers)
+    container_list = create_containers(args.cluster_type.lower(), routers)
 
     info('\n*** Adding container-switch links\n')
     for c, s in zip(container_list, switches):
@@ -401,7 +406,6 @@ def main():
 
     info('\n*** Starting network\n')
     net.start()
-    # net.staticArp()
 
     info('\n*** Testing connectivity\n')
     if args.no_clients:
@@ -424,16 +428,13 @@ def main():
         c.cmd("ip link set eth0 down")
 
     if not args.no_clients:
-        for s in sub_list:
+        for s, p in zip(sub_list, pub_list):
             s.cmd("ip link set eth0 down")
-
-        for p in pub_list:
             p.cmd("ip link set eth0 down")
 
     info('\n*** Starting the entrypoints\n')
     # START CONTAINERS
-    for c in container_list:
-        c.start()
+    [c.start() for c in container_list]
 
     info('*** Waiting the boot ({} secs)...\n'.format(args.router_delay))
     time.sleep(args.router_delay)
@@ -451,4 +452,7 @@ if __name__ == "__main__":
 
     args = arg_parse()
     TOTAL_BROKERS = args.num_broker
+    CORE_NUM = CPU_ANTLAB if args.cpu else CPU_VBOX
+    core_list = list(range(0, CORE_NUM))
+
     main()
