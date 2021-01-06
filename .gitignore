@@ -4,3 +4,4 @@ clients/old
 confiles/rabbitmq*.conf
 confiles/mosquitto*.conf
 confiles/vernemq*.conf
+confiles/hivemq.lic

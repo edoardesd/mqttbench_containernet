@@ -47,7 +47,7 @@ class MyRouter:
         self.mainIP = '{}/24'.format(next(self.networkIP.hosts()))
         self.eth_available = ['{}-eth{}'.format(self.name, eth) for eth in range(TOTAL_BROKERS)]
         self.eth_used = []
-        self.switch = []
+        self.switch = None
         self.routing_binding = []
         self.router = net.addHost(self.name, cls=LinuxRouter, ip=self.mainIP)
 
@@ -59,7 +59,12 @@ class MyRouter:
     def add_binding(self, bind):
         self.routing_binding.append(bind)
 
-
+    def add_switch(self):
+        self.switch = net.addSwitch('s{}'.format(self.id))
+        net.addLink(self.switch, self.router,
+                    intfName=self.get_eth(),
+                    params2={'ip': self.mainIP})
+        return self.switch
 
 class LinuxRouter(Node):
     def config(self, **params):
@@ -308,155 +313,45 @@ def core_network():
     info('\n*** Adding controller')
     net.addController('c0', port=6654)
     info('  DONE\n')
-    router_class = []
 
     info('*** Adding routers\n')
-    for brok in range(TOTAL_BROKERS):
-        router_class.append(MyRouter(id=brok, networkIP=ipaddress.ip_network('10.0.{}.0/24'.format(brok))))
+    _routers = [MyRouter(id=brok, networkIP=ipaddress.ip_network('10.0.{}.0/24'.format(brok)))
+                for brok in range(TOTAL_BROKERS)]
 
-    for r in router_class:
-        print(r.router, r.mainIP, r.networkIP)
     info('*** Adding switches\n')
-    switch_list = [net.addSwitch('s{}'.format(s)) for s in range(TOTAL_BROKERS)]
+    _switches = [r.add_switch() for r in _routers]
 
-    info('*** Adding router-switch links\n')
-    for s, r in zip(switch_list, router_class):
-        print(net.addLink(s, r.router, intfName2=r.get_eth(), params2={'ip': r.mainIP}))
+    #info('*** Adding router-switch links\n')
+    #for s, r in zip(_switches, _routers):
+    #    print(net.addLink(s, r.router, intfName2=r.get_eth(), params2={'ip': r.mainIP}))
 
     info('*** Adding router-router links\n')
-    list_params = [10,10,11,11,20,20]
-
-    #net.addLink(router_class[0].router, router_class[1].router, intfName1='r0-eth1', intfName2='r1-eth1',
-    #            params1={'ip': '10.1.0.1/24'},
-    #            params2={'ip': '10.1.0.2/24'},
-    #            cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    #net.addLink(router_class[0].router, router_class[2].router, intfName1='r0-eth2', intfName2='r2-eth1',
-    #            params1={'ip': '10.2.0.1/24'},
-    #            params2={'ip': '10.2.0.2/24'},
-    #            cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    #net.addLink(router_class[1].router, router_class[2].router, intfName1='r1-eth2', intfName2='r2-eth2',
-    #            params1={'ip': '10.12.0.1/24'},
-    #            params2={'ip': '10.12.0.2/24'},
-    #            cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    for combo in list(itertools.combinations(router_class, 2)):
-        router1 = combo[0]
-        router2 = combo[1]
-        intfName1 = router1.get_eth()
-        intfName2 = router2.get_eth()
+    for (router1, router2) in list(itertools.combinations(_routers, 2)):
+        intf_name1 = router1.get_eth()
+        intf_name2 = router2.get_eth()
         params1 = '10.{}.0.1'.format(int(''.join(sorted(str(e) for e in [router1.id, router2.id]))), reverse=True)
         params2 = '10.{}.0.2'.format(int(''.join(sorted(str(e) for e in [router1.id, router2.id]))), reverse=True)
 
-        router1.add_binding((router2.networkIP, params2, intfName1))
-        router2.add_binding((router1.networkIP, params1, intfName2))
+        router1.add_binding((router2.networkIP, params2, intf_name1))
+        router2.add_binding((router1.networkIP, params1, intf_name2))
 
-        print(router1.router, router2.router)
-        print((router1.name, router2.name))
-        print(intfName1, intfName2)
-        print(params1, params2)
-        print(net.addLink(router1.router, router2.router,
-                          intfName1=intfName1,
-                          intfName2=intfName2,
-                          params1={'ip': '{}/24'.format(params1)},
-                          params2={'ip': '{}/24'.format(params2)},
-                          cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1
-                          ))
+        net.addLink(router1.router, router2.router,
+                    intfName1=intf_name1,
+                    intfName2=intf_name2,
+                    params1={'ip': '{}/24'.format(params1)},
+                    params2={'ip': '{}/24'.format(params2)},
+                    cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1
+                    )
 
     info('*** Adding routing\n')
-    for r in router_class:
+    for r in _routers:
         for bind in r.routing_binding:
             _cmd = "ip route add {to_reach} via {host} dev {eth_int}".format(to_reach=bind[0],
                                                                              host=bind[1],
                                                                              eth_int=bind[2])
-            print(_cmd)
             r.router.cmd(_cmd)
 
-    # from 0 to all
-    # net.addLink(router_list[0], router_list[1], intfName1='r0-eth1', intfName2='r1-eth1',
-    #            params1={'ip': '10.10.0.1/24'},
-    #            params2={'ip': '10.10.0.2/24'},
-    #            cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-    # net.addLink(router_list[0], router_list[2], intfName1='r0-eth2', intfName2='r2-eth1',
-    #            params1={'ip': '10.11.0.1/24'},
-    #            params2={'ip': '10.11.0.2/24'},
-    #            cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-    # net.addLink(router_list[0], router_list[3], intfName1='r0-eth3', intfName2='r3-eth1',
-    #            params1={'ip': '10.12.0.1/24'},
-    #            params2={'ip': '10.12.0.2/24'},
-    #            cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    # net.addLink(router_list[0], router_list[4], intfName1='r0-eth4', intfName2='r4-eth1',
-    #            params1={'ip': '10.13.0.1/24'},
-    #            params2={'ip': '10.13.0.2/24'},
-    #            cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    # from 1 to all
-    # net.addLink(router_list[1], router_list[2], intfName1='r1-eth2', intfName2='r2-eth2',
-    #            params1={'ip': '10.20.0.1/24'},
-    #            params2={'ip': '10.20.0.2/24'},
-    #            cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    # net.addLink(router_list[1], router_list[3], intfName1='r1-eth3', intfName2='r3-eth2',
-    #            params1={'ip': '10.21.0.1/24'},
-    #            params2={'ip': '10.21.0.2/24'},
-    #            cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    # net.addLink(router_list[1], router_list[4], intfName1='r1-eth4', intfName2='r4-eth2',
-    #            params1={'ip': '10.22.0.1/24'},
-    #            params2={'ip': '10.22.0.2/24'},
-    #            cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    # from 2 to all
-    # net.addLink(router_list[2], router_list[3], intfName1='r2-eth3', intfName2='r3-eth3',
-    #            params1={'ip': '10.30.0.1/24'},
-    #            params2={'ip': '10.30.0.2/24'},
-    #            cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    # net.addLink(router_list[2], router_list[4], intfName1='r2-eth4', intfName2='r4-eth3',
-    #            params1={'ip': '10.31.0.1/24'},
-    #            params2={'ip': '10.31.0.2/24'},
-    #            cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    # from 3 to 4
-    # net.addLink(router_list[3], router_list[4], intfName1='r3-eth4', intfName2='r4-eth4',
-    #            params1={'ip': '10.40.0.1/24'},
-    #            params2={'ip': '10.40.0.2/24'},
-    #            cls=TCLink, delay='{}ms'.format(args.router_delay / 2), bw=1)
-
-    # router 0
-    #router_list[0].cmd("ip route add 10.0.1.0/24 via 10.10.0.2 dev r0-eth1")
-    #router_list[0].cmd("ip route add 10.0.2.0/24 via 10.11.0.2 dev r0-eth2")
-    #router_list[0].cmd("ip route add 10.0.3.0/24 via 10.12.0.2 dev r0-eth3")
-    #router_list[0].cmd("ip route add 10.0.4.0/24 via 10.13.0.2 dev r0-eth4")
-
-    # router 1
-    #router_list[1].cmd("ip route add 10.0.0.0/24 via 10.10.0.1 dev r1-eth1")
-    #router_list[1].cmd("ip route add 10.0.2.0/24 via 10.20.0.2 dev r1-eth2")
-    #router_list[1].cmd("ip route add 10.0.3.0/24 via 10.21.0.2 dev r1-eth3")
-    #router_list[1].cmd("ip route add 10.0.4.0/24 via 10.22.0.2 dev r1-eth4")
-
-    # router 2
-    #router_list[2].cmd("ip route add 10.0.0.0/24 via 10.11.0.1 dev r2-eth1")
-    #router_list[2].cmd("ip route add 10.0.1.0/24 via 10.20.0.1 dev r2-eth2")
-    #router_list[2].cmd("ip route add 10.0.3.0/24 via 10.30.0.2 dev r2-eth3")
-    #router_list[2].cmd("ip route add 10.0.4.0/24 via 10.31.0.2 dev r2-eth4")
-
-    # router 3
-    #router_list[3].cmd("ip route add 10.0.0.0/24 via 10.12.0.1 dev r3-eth1")
-    #router_list[3].cmd("ip route add 10.0.1.0/24 via 10.21.0.1 dev r3-eth2")
-    #router_list[3].cmd("ip route add 10.0.2.0/24 via 10.30.0.1 dev r3-eth3")
-    #router_list[3].cmd("ip route add 10.0.4.0/24 via 10.40.0.2 dev r3-eth4")
-
-    # router 4
-    #router_list[4].cmd("ip route add 10.0.0.0/24 via 10.13.0.1 dev r4-eth1")
-    #router_list[4].cmd("ip route add 10.0.1.0/24 via 10.22.0.1 dev r4-eth2")
-    #router_list[4].cmd("ip route add 10.0.2.0/24 via 10.31.0.1 dev r4-eth3")
-    #router_list[4].cmd("ip route add 10.0.3.0/24 via 10.40.0.1 dev r4-eth4")
-
-    return switch_list, router_class
-    return switch_list, networks, router_list
+    return _switches, _routers
 
 
 def main():
@@ -467,17 +362,18 @@ def main():
     info('\n\tDELAY: router: {} switch: {}'.format(args.router_delay, args.container_delay))
     info('\n')
 
-    #s_list, ip_routers, rout_list = core_network()
-    s_list, routers = core_network()
+    switches, routers = core_network()
     ip_routers = [r.networkIP for r in routers]
+    router_list = [r.router for r in routers]
+
     info('\n*** Adding docker containers, type: {}\n'.format(args.cluster_type.upper()))
     container_list = create_containers(args.cluster_type.upper(), ip_routers)
 
     info('\n*** Adding container-switch links\n')
-    for c, s in zip(container_list, s_list):
+    for c, s in zip(container_list, switches):
         print(net.addLink(c, s, cls=TCLink, delay='{}ms'.format(args.container_delay)))
 
-    # #creating subs
+    # Creating subs
     if not args.no_clients:
         info('\n*** Adding subscribers\n')
         sub_list = []
@@ -488,7 +384,7 @@ def main():
             sub_list.append(sub)
 
         # switch sub link
-        for sw, sb in zip(s_list, sub_list):
+        for sw, sb in zip(switches, sub_list):
             print(net.addLink(sw, sb))
 
         info('\n*** Adding publishers\n')
@@ -500,21 +396,12 @@ def main():
             pub_list.append(pub)
 
         # switch pub link
-        for sw, pb in zip(s_list, pub_list):
+        for sw, pb in zip(switches, pub_list):
             print(net.addLink(sw, pb))
 
     info('\n*** Starting network\n')
     net.start()
     # net.staticArp()
-
-    info('*** Routing Table on Router:\n')
-    print((net['r0'].cmd('route')))
-
-    info('*** Routing Table on Router:\n')
-    print((net['r1'].cmd('route')))
-
-    info('*** Routing Table on Router:\n')
-    print((net['r2'].cmd('route')))
 
     info('\n*** Testing connectivity\n')
     if args.no_clients:
@@ -526,7 +413,7 @@ def main():
         for pb, cnt in zip(pub_list, container_list):
             net.ping([pb, cnt])
 
-        for pairs in list(itertools.permutations(rout_list + container_list, 2)):
+        for pairs in list(itertools.permutations(router_list + container_list, 2)):
             net.ping(pairs)
 
     info('\n*** Waiting the network start up ({} secs)...\n'.format(args.router_delay / 2))
