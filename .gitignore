@@ -6,3 +6,4 @@ confiles/mosquitto?.conf
 confiles/vernemq?.conf
 confiles/config-dns?.xml
 confiles/hivemq.lic
+.erlang.cookie
