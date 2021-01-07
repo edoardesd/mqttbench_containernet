@@ -166,7 +166,7 @@ def start_rabbitmq(container):
 
 def start_hivemq(container):
     source_config_file_path = os.path.join(PWD, 'confiles/config-dns.xml')
-    dest_file = "{}/confiles/config-dns_{}.xml".format(PWD, container.id)
+    dest_file = "{}/confiles/config-dns{}.xml".format(PWD, container.id)
 
     __port = 8000
     config_file = ET.parse(source_config_file_path)
@@ -199,7 +199,7 @@ def start_hivemq(container):
                              ports=[1883], port_bindings={1883: container.bind_port},
                              dimage=IMAGES["HIVEMQ"],
                              volumes=[
-                                 PWD + "/confiles/config-dns_{}.xml:/opt/hivemq/conf/config.xml".format(container.id)],
+                                 PWD + "/confiles/config-dns{}.xml:/opt/hivemq/conf/config.xml".format(container.id)],
                              mem_limit=container.ram,
                              cpuset_cpus=container.cpu,
                              environment={
@@ -210,12 +210,9 @@ def start_hivemq(container):
 
 def start_vernemq(container):
     dest_file = "{}/confiles/vernemq{}.conf".format(PWD, container.id)
+    copyfile(PWD + "/confiles/vernemq.conf", dest_file)
 
-    with open(dest_file, "w") as f:
-        f.write("\naccept_eula=yes")
-        f.write("\nallow_anonymous=on\nlog.console=console")
-        f.write("\nerlang.distribution.port_range.minimum = 9100")
-        f.write("\nerlang.distribution.port_range.maximum = 9109")
+    with open(dest_file, "a") as f:
         f.write("\nlistener.tcp.default = ###IPADDRESS###:1883")
         f.write("\nlistener.ws.default = ###IPADDRESS###:8080")
         f.write("\nlistener.vmq.clustering = ###IPADDRESS###:44053")
@@ -244,13 +241,8 @@ def start_vernemq(container):
 
 
 def start_mosquitto(container):
-#def start_mosquitto(cont_name, cont_address, bind_ip, master_node, default_route, cpu):
     dest_file = "{}/confiles/mosquitto{}.conf".format(PWD, container.id)
-
-    with open(dest_file, "w") as f:
-        f.write("persistence true\npersistence_location /mosquitto/data/\n")
-        f.write("log_dest file /mosquitto/log/mosquitto.log\n")
-        f.write("log_dest stdout\nlog_type all")
+    copyfile(PWD + "/confiles/mosquitto.conf", dest_file)
 
     if container.name in container.master:
         print("master master")
@@ -258,11 +250,13 @@ def start_mosquitto(container):
             _ip = "{}{}.100/24".format(IP_ADDR, i)
             if _ip != container.address:
                 with open(dest_file, "a") as f:
-                    f.write("\nconnection id_{}\n".format(i))
-                    f.write("address {}:{}\n".format(_ip[:-3], 1883))
-                    f.write("topic # both {}\n".format(BRIDGE_QOS))
-                    f.write("remote_clientid id_{}\n\n".format(i))
-                    f.write("keepalive_interval 5")
+                    f.write("\n\nconnection id{}".format(i))
+                    f.write("\naddress {}:{}".format(_ip[:-3], 1883))
+                    f.write("\ntopic # both {}".format(BRIDGE_QOS))
+                    f.write("\nremote_clientid id{}".format(i))
+
+        with open(dest_file, "a") as f:
+            f.write("\n\nkeepalive_interval 5")
 
     return net.addDocker(hostname=container.name, name=container.name, ip=container.address,
                          defaultRoute='via {}'.format(container.default_route),
@@ -426,8 +420,7 @@ def main():
             s.cmd("ip link set eth0 down")
             p.cmd("ip link set eth0 down")
 
-    info('\n*** Starting the entrypoints\n')
-    # START CONTAINERS
+    info('\n*** Starting the containers (entrypoints)\n')
     [c.start() for c in container_list]
 
     info('*** Waiting the boot ({} secs)...\n'.format(args.router_delay))

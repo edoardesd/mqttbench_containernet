@@ -1,7 +1,8 @@
 #untrack folders
 experiments/
 clients/old
-confiles/rabbitmq*.conf
-confiles/mosquitto*.conf
-confiles/vernemq*.conf
+confiles/rabbitmq?.conf
+confiles/mosquitto?.conf
+confiles/vernemq?.conf
+confiles/config-dns?.xml
 confiles/hivemq.lic
