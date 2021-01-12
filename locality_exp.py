@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import docker
 import math
 import os
 import random
@@ -16,27 +17,22 @@ NUMBER_SIMULATIONS = 1
 qos_list = [0, 1, 2]
 topic_name = "topic"
 message_delay = 1
-CLUSTER_SIZE = 2
+#CLUSTER_SIZE = 5
 
 MESSAGE_TIME = 51
 CLIENTS_CREATION = 5
 
 DELAY = 10
 
-locality_dict = {
-    0: {
-        'pub': random.randint(0, CLUSTER_SIZE - 1),
-        'sub': None},
-    50: {
-        'pub': random.randint(0, CLUSTER_SIZE - 1),
-        'sub': [i for i in range(0, CLUSTER_SIZE)]},
-    100: {
-        'pub': random.randint(0, CLUSTER_SIZE - 1),
-        'sub': None}
-}
-locality_dict[0]['sub'] = [random.choice(
-    [i for i in range(0, CLUSTER_SIZE) if i not in [locality_dict[0]['pub']]])] * CLUSTER_SIZE
-locality_dict[100]['sub'] = [locality_dict[100]['pub']] * CLUSTER_SIZE
+
+def get_cluster_size():
+    client = docker.from_env()
+    clients = client.containers.list()
+    size = 0
+    for container in clients:
+        if not any(x in container.attrs['Name'] for x in ['pub', 'sub']):
+            size += 1
+    return size
 
 
 def arg_parse():
@@ -55,16 +51,35 @@ def arg_parse():
                         help='do not send messages')
     parser.add_argument('--no-clients', dest='no_clients', default=False, action='store_true',
                         help='do not load pubs and subs')
-    parser.add_argument('-b', '--brokers', dest='num_broker', default=CLUSTER_SIZE,
+    parser.add_argument('-b', '--brokers', dest='num_broker', default=get_cluster_size(),
                         help='cluster size', type=int)
 
     return parser.parse_args()
 
 
+def select_pub_sub():
+    pub_sub = {
+        0: {
+            'pub': random.randint(0, CLUSTER_SIZE - 1),
+            'sub': None},
+        50: {
+            'pub': random.randint(0, CLUSTER_SIZE - 1),
+            'sub': [i for i in range(0, CLUSTER_SIZE)]},
+        100: {
+            'pub': random.randint(0, CLUSTER_SIZE - 1),
+            'sub': None}
+    }
+    pub_sub[0]['sub'] = [random.choice(
+        [i for i in range(0, CLUSTER_SIZE) if i not in [pub_sub[0]['pub']]])] * CLUSTER_SIZE
+    pub_sub[100]['sub'] = [pub_sub[100]['pub']] * CLUSTER_SIZE
+
+    return pub_sub
+
+
 def print_details():
     print()
     print("-" * 20)
-    pp.pprint(locality_dict)
+    # pp.pprint(locality_dict)
     print("._" * 10)
     print("Cluster size: {}".format(CLUSTER_SIZE))
     print("# of subscribers: {}".format(NUM_SUBSCRIBERS))
@@ -103,13 +118,13 @@ def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
         for indx, sub in enumerate(_subscribers):
             subscriber_cmd = "docker exec -d mn.sub{id} python3 mosquitto_sub.py -h 10.0.{id}.100 " \
                              "-t {topic} -q {qos} -m {msg} -c {clients} --folder {folder} --file-name {name}".format(
-                                                            id=sub,
-                                                            topic=topic_name,
-                                                            qos=_qos,
-                                                            msg=NUM_MESSAGES,
-                                                            clients=math.floor(NUM_SUBSCRIBERS / len(_subscribers)),
-                                                            folder=_path,
-                                                            name="{}_{}".format(_file_name, indx))
+                id=sub,
+                topic=topic_name,
+                qos=_qos,
+                msg=NUM_MESSAGES,
+                clients=math.floor(NUM_SUBSCRIBERS / len(_subscribers)),
+                folder=_path,
+                name="{}_{}".format(_file_name, indx))
 
             subprocess.Popen(subscriber_cmd, shell=True)
             print("Subscriber {index} created. Broker {id}".format(index=indx, id=sub))
@@ -121,14 +136,14 @@ def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
     publisher_cmd = "docker exec -t mn.pub{id_pub} mqtt-benchmark --broker tcp://10.0.{id_pub}.100:1883 " \
                     "--topic {topic} --clients {clients} --count {msg} --qos {qos} --delay {rate} " \
                     "--folder {folder} --file-name {name}".format(
-                                                                id_pub=_publisher,
-                                                                topic=topic_name,
-                                                                qos=_qos,
-                                                                msg=NUM_MESSAGES,
-                                                                clients=NUM_PUBLISHERS,
-                                                                rate=message_delay,
-                                                                folder=_path,
-                                                                name=_file_name)
+        id_pub=_publisher,
+        topic=topic_name,
+        qos=_qos,
+        msg=NUM_MESSAGES,
+        clients=NUM_PUBLISHERS,
+        rate=message_delay,
+        folder=_path,
+        name=_file_name)
 
     if args.no_messages or args.no_clients:
         print("no messages, waiting...")
@@ -139,6 +154,8 @@ def start_clients(_subscribers, _publisher, _qos, _path, _file_name):
 
 def simulation(sim_num):
     for q in qos_list:
+        locality_dict = select_pub_sub()
+        pp.pprint(locality_dict)
         for loc, clients in locality_dict.items():
             path = "experiments/{day}/{type}/{minute}/{sim}/{qos}qos/{local}locality/".format(
                 day=START_DAY,
@@ -207,12 +224,12 @@ def simulation(sim_num):
 def main():
     print_details()
 
-    for sim in range(1, NUMBER_SIMULATIONS+1):
+    for sim in range(1, NUMBER_SIMULATIONS + 1):
         simulation(sim)
         print()
-        print("-"*50)
+        print("-" * 50)
         print("Simulation level {} done".format(sim))
-        print("-"*50)
+        print("-" * 50)
         time.sleep(DELAY * 2)
 
 
