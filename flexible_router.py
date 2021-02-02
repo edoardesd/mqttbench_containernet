@@ -39,7 +39,7 @@ IMAGES = {
 
 
 class MyContainer:
-    def __init__(self, _id, cluster_type, router_ip, cpu):
+    def __init__(self, _id, cluster_type, router_ip, cpu, ram):
         self.cluster_type = cluster_type
         self.id = _id
         self.name = "{}{}".format(self.cluster_type, self.id)
@@ -49,7 +49,7 @@ class MyContainer:
         self.bind_port = 1880 + self.id
         self.master = "{}@{}".format(self.name, self.address)
         self.cpu = cpu
-        self.ram = args.ram_limit
+        self.ram = ram
 
     def get_master(self):
         return self.master
@@ -296,7 +296,7 @@ def create_containers(broker_type, _routers):
     my_master = None
 
     for r in _routers:
-        container = MyContainer(r.id, broker_type, r.networkIP, assign_cpu(core_list))
+        container = MyContainer(r.id, broker_type, r.networkIP, assign_cpu(core_list), args.ram_limit)
         if my_master is None:
             my_master = container.get_master()
         else:
